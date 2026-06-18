@@ -109,7 +109,7 @@ watch(() => ui.detailUid, (v) => { if (v) tutorialView('detail'); });
     <button class="tb-btn" @click="toggleLang" data-testid="lang-btn">{{ i18n.lang === 'es' ? 'EN' : 'ES' }}</button>
     <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true" data-testid="reset-btn">🗑</button>
     <dotrino-install class="cc-install" :lang="i18n.lang" data-testid="install-btn"></dotrino-install>
-    <dotrino-support class="cc-support" :lang="i18n.lang" href="https://ko-fi.com/dotrino" repo="dotrino/critters" discord="https://discord.gg/D648uq7cth" data-testid="support"></dotrino-support>
+    <dotrino-support class="cc-support" :lang="i18n.lang" href="https://ko-fi.com/dotrino" repo="imdotrino/dotrino-critters" discord="https://discord.gg/D648uq7cth" data-testid="support"></dotrino-support>
   </div>
 
   <nav class="tabs">
