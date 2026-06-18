@@ -1,0 +1,7 @@
+# Solo la cáscara pública de la herramienta es indexable.
+# La colección y el progreso viven en el store/localStorage del usuario y nunca
+# llegan al servidor: no es indexable y así debe seguir.
+User-agent: *
+Allow: /
+
+Sitemap: https://critters.dotrino.com/sitemap.xml

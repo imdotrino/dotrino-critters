@@ -1,0 +1,6 @@
+# artefactos generados (editables/render); los scripts sí se versionan
+*.blend
+*.blend1
+*.png
+*.json
+__pycache__/

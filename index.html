@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Critters">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Critters — monstruos coleccionables y arena de batalla automática</title>
+<meta name="description" content="Colecciona monstruos procedurales únicos y arma tu equipo de 5 en una rejilla 3×3. La arena pelea sola: gana la estrategia, los tipos y la posición, no los reflejos. Campaña por niveles. Funciona sin conexión." />
+<link rel="canonical" href="https://critters.dotrino.com/" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="es_ES" />
+<meta property="og:site_name" content="Dotrino" />
+<meta property="og:title" content="Critters" />
+<meta property="og:description" content="Monstruos coleccionables + arena de batalla automática (determinista, posicional 3×3). Procedural infinito." />
+<meta property="og:url" content="https://critters.dotrino.com/" />
+<meta property="og:image" content="https://critters.dotrino.com/og.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Critters" />
+<meta name="twitter:description" content="Monstruos coleccionables + arena de batalla automática (determinista, posicional 3×3)." />
+<meta name="twitter:image" content="https://critters.dotrino.com/og.jpg" />
+<!-- Analítica cookieless autohosteada (GoatCounter); no cuenta en localhost/LAN. -->
+<script>window.goatcounter={path:function(p){return location.hostname+p}}</script>
+<script data-goatcounter="https://goat.dotrino.com/count" async src="https://goat.dotrino.com/count.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Critters",
+  "url": "https://critters.dotrino.com/",
+  "description": "Monstruos coleccionables con arena de batalla automática determinista y posicional (3×3), roster procedural infinito.",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "publisher": { "@type": "Organization", "name": "Dotrino", "url": "https://dotrino.com/" }
+}
+</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@dotrino/support@0.3/src/index.js"></script>
+</body>
+</html>

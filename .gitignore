@@ -1,0 +1,16 @@
+.claude/
+node_modules/
+dist/
+test-results/
+playwright-report/
+.playwright-mcp/
+.env
+.env.*
+!.env.example
+tools/lambda/.venv/
+__pycache__/
+tools/lambda/render/
+node_modules
+dist
+build
+.DS_Store
