@@ -1,9 +1,12 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, watchEffect, onMounted } from 'vue';
 import { game, loadGame, resetGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
-import { i18n, t, toggleLang } from './i18n.js';
+import { i18n, t, setLang } from './i18n.js';
 import { nav } from './nav.js';
+import { getIdentity } from './identity.js';
+import { getReputation } from './reputation.js';
+import { inviteLink } from './referrals.js';
 import { ui, closeCritter } from './ui.js';
 import { isMuted as sfxIsMuted, toggleMuted as sfxToggle } from './sfx.js';
 import { onView as tutorialView, resetAllTutorials } from './tutorial.js';
@@ -38,7 +41,64 @@ const toast = ref('');
 let toastT = null;
 function showToast (m) { toast.value = m; clearTimeout(toastT); toastT = setTimeout(() => { toast.value = ''; }, 1900); }
 
-onMounted(() => { loadGame(); });
+// ─── Topbar estándar del ecosistema (@dotrino/topbar, §5) ───────────────────
+// El header (volver, marca, idioma, perfil y moneda de support) lo pone el
+// componente compartido: la app no lo reimplementa. Solo le pasa sus acciones
+// propias por slot y los pilares que ya maneja (identidad + reputación) para
+// que abra él mismo el modal "Mi perfil" (§6.1).
+const topbarRef = ref(null);
+const identityInst = ref(null);
+const reputationInst = ref(null);
+
+// Modal de perfil con la paleta "Bestiario Arcano" del juego (vars --ccp-*).
+const profileTheme = {
+  '--ccp-bg': '#120f24', '--ccp-bg-2': '#1a1633', '--ccp-bg-3': '#241d44', '--ccp-bg-4': '#2e2554',
+  '--ccp-border': 'rgba(167,139,250,.30)', '--ccp-text': '#ece9ff', '--ccp-muted': '#9b93c7',
+  '--ccp-accent': '#8b5cf6', '--ccp-accent-2': '#7c3aed', '--ccp-accent-text': '#ffffff',
+  '--ccp-gold': '#ffd24a', '--ccp-derived': '#e0b03a',
+  '--ccp-online': '#4ade80', '--ccp-affinity': '#38e1d6',
+  '--ccp-input-bg': 'rgba(167,139,250,.08)', '--ccp-radius': '16px',
+  '--ccp-font': "'Hanken Grotesk', system-ui, sans-serif",
+  '--ccp-font-headline': "'Bricolage Grotesque', system-ui, sans-serif",
+  '--ccp-font-mono': "'JetBrains Mono', ui-monospace, monospace",
+};
+
+watchEffect(() => {
+  const tb = topbarRef.value; if (!tb) return;
+  tb.identity = identityInst.value ?? null;
+  tb.reputation = reputationInst.value ?? null;
+  tb.profileTheme = profileTheme;
+});
+
+// El idioma lo manda el topbar (fuente de verdad); la app solo lo refleja.
+function onLang (e) { setLang(e.detail && e.detail.lang); }
+
+// Enlace de invitación en el botón de compartir (recompensa por compartir, §12).
+// La moneda de support ahora vive DENTRO del shadow DOM del topbar y este la
+// recrea en cada render suyo (idioma/avatar), así que `share-url` se re-aplica
+// con un observer: el topbar 0.3.0 no expone un passthrough del atributo.
+let shareObs = null;
+async function wireShareUrl (tb) {
+  if (shareObs || !tb || !tb.shadowRoot) return;
+  const link = await inviteLink().catch(() => null);
+  if (!link || !topbarRef.value) return;
+  const apply = () => {
+    const s = tb.shadowRoot.querySelector('dotrino-support');
+    if (s && s.getAttribute('share-url') !== link) s.setAttribute('share-url', link);
+  };
+  apply();
+  shareObs = new MutationObserver(apply);
+  shareObs.observe(tb.shadowRoot, { childList: true, subtree: true });
+}
+// El topbar no existe en la pantalla inicial (StarterView), así que se cablea
+// cuando aparece, no en onMounted.
+watch(topbarRef, (tb) => { if (tb) wireShareUrl(tb); });
+
+onMounted(async () => {
+  loadGame();
+  identityInst.value = await getIdentity();
+  if (identityInst.value) reputationInst.value = await getReputation();
+});
 
 // La batalla es una "capa" de navegación: el back físico / chevron la cierran y
 // vuelven a la pantalla del juego (NO a dotrino.com). Una sola vía: cerrar la
@@ -97,20 +157,33 @@ watch(() => ui.detailUid, (v) => { if (v) tutorialView('detail'); });
 <template>
   <StarterView v-if="needsStarter" />
   <template v-else>
-  <div class="topbar">
-    <dotrino-back style="color:var(--text);--cc-back-size:34px" data-testid="back"></dotrino-back>
-    <div class="brand"><img src="/icon.svg" alt="" /><span>Critters</span></div>
-    <div class="spacer"></div>
-    <div class="wallet" data-testid="wallet">
-      <span class="coin">🪙 {{ game.wallet.coins }}</span>
-      <span class="frag">🔹 {{ game.wallet.frags }}</span>
+  <!-- `.attr` es OBLIGATORIO en `lang`: es una propiedad nativa de HTMLElement, así
+       que Vue la escribiría como PROPIEDAD, y <dotrino-topbar> la sombrea con un
+       getter sin setter → la asignación falla y el binding queda en nada. El
+       componente lee el ATRIBUTO (está en su observedAttributes). -->
+  <dotrino-topbar
+    ref="topbarRef"
+    brand="Critters"
+    icon="/icon.svg"
+    brand-href="./"
+    :lang.attr="i18n.lang"
+    profile
+    support-href="https://ko-fi.com/dotrino"
+    support-repo="imdotrino/dotrino-critters"
+    support-discord="https://discord.gg/D648uq7cth"
+    @dotrino-lang="onLang">
+    <!-- Acciones propias del juego: van en UN grupo (slot 'end') para conservar
+         su orden; el slot suelta sus hijos en un contenedor row-reverse. -->
+    <div class="tb-actions" slot="end">
+      <div class="wallet" data-testid="wallet">
+        <span class="coin">🪙 {{ game.wallet.coins }}</span>
+        <span class="frag">🔹 {{ game.wallet.frags }}</span>
+      </div>
+      <button class="tb-btn" @click="toggleSfx" title="sonido" data-testid="sound-btn">{{ sfxMuted ? '🔇' : '🔊' }}</button>
+      <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true" data-testid="reset-btn">🗑</button>
+      <dotrino-install class="cc-install" :lang="i18n.lang" data-testid="install-btn"></dotrino-install>
     </div>
-    <button class="tb-btn" @click="toggleSfx" title="sonido" data-testid="sound-btn">{{ sfxMuted ? '🔇' : '🔊' }}</button>
-    <button class="tb-btn" @click="toggleLang" data-testid="lang-btn">{{ i18n.lang === 'es' ? 'EN' : 'ES' }}</button>
-    <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true" data-testid="reset-btn">🗑</button>
-    <dotrino-install class="cc-install" :lang="i18n.lang" data-testid="install-btn"></dotrino-install>
-    <dotrino-support class="cc-support" :lang="i18n.lang" href="https://ko-fi.com/dotrino" repo="imdotrino/dotrino-critters" discord="https://discord.gg/D648uq7cth" data-testid="support"></dotrino-support>
-  </div>
+  </dotrino-topbar>
 
   <nav class="tabs">
     <button :class="{ on: tab === 'campana' }" @click="goTab('campana')" data-testid="tab-campana">{{ t('campana') }}</button>

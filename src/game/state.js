@@ -90,10 +90,11 @@ export async function loadGame () {
 }
 
 // Borra SOLO los datos de Critters (local + su hilo en el store) y recarga.
-// IMPORTANTE: acotado a este juego — NO toca el vault/perfil (Critters ni usa
-// identidad) ni los datos de otras apps. En localStorage solo elimina claves con
-// prefijo "critters." (deja "critters_lang"); en el store compartido solo borra
-// el hilo `critters.save` (un removeThread puntual, nunca un clear global).
+// IMPORTANTE: acotado a este juego — NO toca el vault/perfil (la identidad es del
+// usuario, no del juego) ni los datos de otras apps. En localStorage solo elimina
+// claves con prefijo "critters." (deja intacta la preferencia compartida de idioma
+// "dotrino.lang"); en el store compartido solo borra el hilo `critters.save` (un
+// removeThread puntual, nunca un clear global).
 export async function resetGame () {
   try { Object.keys(localStorage).filter(k => k.startsWith('critters.')).forEach(k => localStorage.removeItem(k)); } catch {}
   try { await clearSave(); } catch {}

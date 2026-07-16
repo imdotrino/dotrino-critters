@@ -46,20 +46,40 @@ body::before{
 #app{height:100%;display:flex;flex-direction:column;position:relative;z-index:2}
 button{font-family:inherit;cursor:pointer;color:inherit}
 
-/* ---- topbar ---- */
-.topbar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-top:calc(env(safe-area-inset-top) + 8px);
-  background:linear-gradient(180deg, rgba(18,15,36,.92), rgba(18,15,36,.55));backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+/* ---- topbar: <dotrino-topbar> (@dotrino/topbar, CONVENCIONES §5) ----
+   El header lo pone el componente compartido del ecosistema; aquí solo se
+   tematiza con la paleta del juego y se estilan las acciones propias (que
+   viven en LIGHT DOM, vía slot). Nada de re-armar la barra a mano. */
+dotrino-topbar{
+  flex:0 0 auto;
+  --dotrino-topbar-bg:linear-gradient(180deg, rgba(18,15,36,.92), rgba(18,15,36,.55));
+  --dotrino-topbar-border:var(--line);
+  --dotrino-topbar-text:var(--text);
+  --dotrino-topbar-muted:var(--muted);
+  --dotrino-topbar-accent:var(--accent2);
+  --dotrino-topbar-accent-text:#fff;
+  --dotrino-topbar-font:var(--fbody);
+  --dotrino-topbar-pad:8px 12px;
+  --dotrino-topbar-gap:8px;
+}
+/* La marca conserva el degradado arcano del juego (el componente expone ::part). */
+dotrino-topbar::part(brand-name){
+  font-family:var(--fdisplay);font-weight:800;font-size:20px;letter-spacing:.01em;
+  background:linear-gradient(95deg,#e9d5ff,#b794ff 45%,#38e1d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+dotrino-topbar::part(brand-icon){width:30px;height:30px;border-radius:0;filter:drop-shadow(0 2px 8px rgba(124,58,237,.6))}
+/* Acciones propias del juego dentro del slot 'end' (light DOM). */
+.tb-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+/* Marca del juego: la sigue usando la pantalla inicial (StarterView), que no tiene
+   topbar; dentro del topbar la marca se estiliza por ::part (arriba). */
 .brand{display:flex;align-items:center;gap:9px}
 .brand img{width:30px;height:30px;filter:drop-shadow(0 2px 8px rgba(124,58,237,.6))}
 .brand span{font-family:var(--fdisplay);font-weight:800;font-size:20px;letter-spacing:.01em;
   background:linear-gradient(95deg,#e9d5ff,#b794ff 45%,#38e1d6);-webkit-background-clip:text;background-clip:text;color:transparent}
-.spacer{flex:1 1 auto}
 .wallet{display:flex;gap:9px;font-family:var(--fmono);font-size:13px;font-weight:700}
 .wallet .coin{color:var(--gold)} .wallet .frag{color:var(--cyan)}
 .tb-btn{border:1px solid var(--line2);background:rgba(167,139,250,.08);color:var(--text);font-weight:800;font-size:12px;padding:6px 10px;border-radius:10px}
 .tb-btn:active{background:rgba(167,139,250,.2)}
-.cc-install,.cc-support{display:inline-flex;align-items:center}
-.cc-install{--cc-install-color:var(--text);--cc-install-icon:16px;--cc-install-radius:10px;--cc-install-font-size:.78rem}
+.cc-install{display:inline-flex;align-items:center;--cc-install-color:var(--text);--cc-install-icon:16px;--cc-install-radius:10px;--cc-install-font-size:.78rem}
 
 /* ---- tabs (segmentado) ---- */
 .tabs{flex:0 0 auto;display:flex;gap:4px;padding:8px 10px;background:transparent}

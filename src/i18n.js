@@ -2,14 +2,29 @@
 // propios módulos (types/roles/forge) con campos es/en.
 import { reactive } from 'vue';
 
-const LANG_KEY = 'critters_lang';
+// El idioma lo manda el <dotrino-topbar>, que lo persiste en la clave COMPARTIDA
+// del ecosistema ('dotrino.lang'): así la preferencia viaja entre apps. La clave
+// vieja y propia ('critters_lang') se migra UNA vez para no resetear al usuario.
+const LANG_KEY = 'dotrino.lang';
+const LANG_KEY_OLD = 'critters_lang';
 
-export const i18n = reactive({
-  lang: (() => { const s = localStorage.getItem(LANG_KEY); if (s === 'es' || s === 'en') return s; return (navigator.language || 'es').toLowerCase().startsWith('en') ? 'en' : 'es'; })(),
-});
+function readLang () {
+  let s = null;
+  try { s = localStorage.getItem(LANG_KEY); } catch {}
+  if (s === 'es' || s === 'en') return s;
+  // Migración única desde la clave propia anterior al topbar.
+  let old = null;
+  try { old = localStorage.getItem(LANG_KEY_OLD); } catch {}
+  if (old === 'es' || old === 'en') {
+    try { localStorage.setItem(LANG_KEY, old); localStorage.removeItem(LANG_KEY_OLD); } catch {}
+    return old;
+  }
+  return (navigator.language || 'es').toLowerCase().startsWith('en') ? 'en' : 'es';
+}
 
-export function setLang (l) { i18n.lang = l; try { localStorage.setItem(LANG_KEY, l); } catch {} document.documentElement.lang = l; }
-export function toggleLang () { setLang(i18n.lang === 'es' ? 'en' : 'es'); }
+export const i18n = reactive({ lang: readLang() });
+
+export function setLang (l) { if (l !== 'es' && l !== 'en') return; i18n.lang = l; try { localStorage.setItem(LANG_KEY, l); } catch {} document.documentElement.lang = l; }
 
 const STR = {
   es: {
