@@ -23,7 +23,7 @@
     "@dotrino/store": "0.7.0",
     "@dotrino/support": "0.8.1",
     "@dotrino/topbar": "0.5.0",
-    "@dotrino/tutorial": "0.1.1",
+    "@dotrino/tutorial": "0.2.0",
     "vue": "^3.5.25"
   },
   "devDependencies": {
