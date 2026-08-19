@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Critters — monstruos coleccionables con arena de batalla automática (determinista, posicional 3×3) del ecosistema Dotrino. Vite + Vue, procedural infinito, sin conexión.",
+  "description": "Critters \u2014 monstruos coleccionables con arena de batalla autom\u00e1tica (determinista, posicional 3\u00d73) del ecosistema Dotrino. Vite + Vue, procedural infinito, sin conexi\u00f3n.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,7 +11,8 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@dotrino/identity": "0.33.0",
@@ -30,6 +31,7 @@
     "@playwright/test": "^1.49.0",
     "@vitejs/plugin-vue": "^6.0.2",
     "vite": "^7.3.1",
-    "vitest": "4.1.8"
+    "vitest": "4.1.8",
+    "typescript": "5.9.3"
   }
 }
