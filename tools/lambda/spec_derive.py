@@ -64,7 +64,7 @@ def spec_from_id(gid):
     """'g:seed:element:role:head:thorax:abdomen:legs:legStyle:ant:hue:pattern' -> spec dict."""
     p = str(gid).split(":")
     if not p or p[0] != "g":
-        raise ValueError("genome id invalido (debe empezar con 'g:'): %r" % gid)
+        raise ValueError("invalid genome id (must start with 'g:'): %r" % gid)
     element = p[2] if len(p) > 2 else "fuego"
     appearance = {
         "head":     _jsnum(p, 4),

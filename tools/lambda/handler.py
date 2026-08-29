@@ -64,7 +64,7 @@ def _render(event, public=False):
         event = json.loads(body or "{}")
     gid = event.get("id")
     if not _valid_genome(gid):                       # rechazo barato ANTES de tocar Blender
-        raise ValueError("genome id invalido: %r" % gid)
+        raise ValueError("invalid genome id: %r" % gid)
     # desde la URL pública no se aceptan specs arbitrarios ni overrides caros
     spec = (event.get("spec") if not public else None) or spec_derive.spec_from_id(gid)
     gid = gid or spec["id"]
