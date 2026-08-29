@@ -12,6 +12,6 @@ export async function getReputation () {
   if (_rep) return _rep;
   const id = await getIdentity();
   if (!id) return null;
-  try { _rep = createVaultReputation(id); } catch (e) { console.warn('Reputación inalcanzable:', e); _rep = null; }
+  try { _rep = createVaultReputation(id); } catch (e) { console.warn('Reputation unreachable:', e); _rep = null; }
   return _rep;
 }

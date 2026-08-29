@@ -10,7 +10,7 @@ export function getIdentity () {
   if (!_idPromise) {
     _idPromise = Identity.connect()
       .then(id => id)
-      .catch(e => { console.warn('Identity vault inalcanzable:', e); return null; });
+      .catch(e => { console.warn('Identity vault unreachable:', e); return null; });
   }
   return _idPromise;
 }

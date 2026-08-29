@@ -26,7 +26,7 @@ async function identifyWithVault (c) {
     const { signature } = await id.signData(data);
     await c.identify({ data, signature });
     myPublickey = publickey;
-  } catch (e) { console.warn('identify (vault) falló:', e); }
+  } catch (e) { console.warn('identify (vault) failed:', e); }
 }
 
 function setupHandlers (c) {
@@ -44,7 +44,7 @@ export function ensureConnected () {
   setupHandlers(c);
   connecting = c.connect()
     .then(async () => { await identifyWithVault(c); return c; })
-    .catch((e) => { console.warn('No se pudo conectar al proxy:', e); return c; })
+    .catch((e) => { console.warn('Could not connect to proxy:', e); return c; })
     .finally(() => { connecting = null; });
   return connecting;
 }

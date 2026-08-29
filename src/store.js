@@ -25,7 +25,7 @@ async function getBackend () {
       }
       throw new Error('store API mismatch');
     } catch (e) {
-      console.warn('[critters] store no disponible, usando localStorage:', (e && e.message) || e);
+      console.warn('[critters] store unavailable, falling back to localStorage:', (e && e.message) || e);
       return shimBackend();
     }
   })();
