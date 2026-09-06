@@ -22,9 +22,9 @@ async function identifyWithVault (c) {
   const publickey = id && id.me && id.me.publickey;
   if (!id || !publickey || !c.token) return;
   try {
-    const data = { op: 'identify', publickey, token: c.token, ts: Date.now() };
-    const { signature } = await id.signData(data);
-    await c.identify({ data, signature });
+    // El sobre lo arma el pilar (`identifyAs`), que además le pone el destinatario: quién
+    // firma y para quién es no son cosa de cada app.
+    await c.identifyAs({ publickey, sign: (d) => id.signData(d) });
     myPublickey = publickey;
   } catch (e) { console.warn('identify (vault) failed:', e); }
 }
