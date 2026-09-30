@@ -2,16 +2,50 @@
 // localStorage para jugar sin conexión. Guardamos un único "documento" de partida.
 let backendPromise = null;
 
-function shimBackend () {
-  const key = t => 'critters.shim.' + t;
-  const read = t => { try { return JSON.parse(localStorage.getItem(key(t))) || []; } catch { return []; } };
-  const write = (t, a) => { try { localStorage.setItem(key(t), JSON.stringify(a)); } catch {} };
+// SIN REPLIEGUE SILENCIOSO (2026-09-30). Hasta ahora, si el almacén no abría, la partida se
+// guardaba sin avisar en localStorage (`critters.shim.<hilo>`) y no llegaba nunca a la bóveda.
+// Ahora: la partida sigue EN MEMORIA y se DICE en pantalla (`onStoreProblem`), y lo que ya se
+// había guardado por ese camino se trae al almacén una vez (`importShim`), sin borrarlo.
+let problem = null;
+const problemListeners = new Set();
+/** Avisa (y avisa al suscribirse, si ya pasó) de que el almacén no abrió: no se guarda nada. */
+export function onStoreProblem (fn) {
+  problemListeners.add(fn);
+  if (problem) fn(problem);
+  return () => problemListeners.delete(fn);
+}
+
+function memoryBackend () {
+  const mem = new Map();
   return {
-    kind: 'localstorage',
-    async appendMessage (t, e) { const a = read(t); a.push(e); write(t, a); },
-    async listThread (t) { return read(t); },
-    async removeThread (t) { try { localStorage.removeItem(key(t)); } catch {} },
+    kind: 'memory',
+    async appendMessage (t, e) { const a = mem.get(t) || []; a.push(e); mem.set(t, a); },
+    async listThread (t) { return mem.get(t) || []; },
+    async removeThread (t) { mem.delete(t); },
   };
+}
+
+const SHIM_PREFIX = 'critters.shim.';
+const SHIM_DONE = 'critters.shim.imported';
+/** Trae al almacén, UNA vez, lo que guardó el repliegue viejo; solo los hilos que el almacén no tiene. */
+async function importShim (store) {
+  let done = null;
+  try { done = localStorage.getItem(SHIM_DONE); } catch { return; }
+  if (done) return;
+  const threads = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(SHIM_PREFIX) || k === SHIM_DONE) continue;
+    let arr = null;
+    try { arr = JSON.parse(localStorage.getItem(k) || '[]'); } catch { arr = null; }
+    if (Array.isArray(arr) && arr.length) threads[k.slice(SHIM_PREFIX.length)] = arr;
+  }
+  for (const t of Object.keys(threads)) {
+    const ya = await store.listThread(t);
+    if (ya.length) delete threads[t];   // lo del almacén es más nuevo que el repliegue
+  }
+  if (Object.keys(threads).length) await store.importThreads(threads, 'merge');
+  localStorage.setItem(SHIM_DONE, String(Date.now()));
 }
 
 async function getBackend () {
@@ -26,13 +60,16 @@ async function getBackend () {
       // perfil una vez, sin borrar el original.
       if (!identity) throw Object.assign(new Error('identity not available'), { code: 'no-identity' });
       const store = await mod.Store.connect({ identity, adoptCommon: ['critters.'] });
+      await importShim(store);
       if (store && typeof store.appendMessage === 'function' && typeof store.listThread === 'function') {
         return { kind: 'store', appendMessage: (t, e) => store.appendMessage(t, e), listThread: (t, o) => store.listThread(t, o), removeThread: t => store.removeThread(t) };
       }
       throw new Error('store API mismatch');
     } catch (e) {
-      console.warn('[critters] store unavailable, falling back to localStorage:', (e && e.message) || e);
-      return shimBackend();
+      console.error('[critters] store unavailable: this game is NOT being saved', e);
+      problem = e;
+      for (const fn of problemListeners) fn(e);
+      return memoryBackend();
     }
   })();
   return backendPromise;

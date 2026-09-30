@@ -39,7 +39,9 @@ const sfxMuted = ref(sfxIsMuted());
 function toggleSfx () { sfxMuted.value = sfxToggle(); }
 const toast = ref('');
 let toastT = null;
-function showToast (m) { toast.value = m; clearTimeout(toastT); toastT = setTimeout(() => { toast.value = ''; }, 1900); }
+function showToast (m, ms = 1900) { toast.value = m; clearTimeout(toastT); toastT = setTimeout(() => { toast.value = ''; }, ms); }
+// Si el almacén no abre, la partida sigue pero NO se guarda: se dice (store.js, sin repliegue).
+import('./store.js').then(({ onStoreProblem }) => onStoreProblem(() => showToast('⚠ ' + t('storeProblem'), 8000)));
 
 // ─── Topbar estándar del ecosistema (@dotrino/topbar, §5) ───────────────────
 // El header (volver, marca, idioma, perfil y moneda de support) lo pone el

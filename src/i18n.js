@@ -28,6 +28,7 @@ export function setLang (l) { if (l !== 'es' && l !== 'en') return; i18n.lang = 
 
 const STR = {
   es: {
+    storeProblem: 'No se pudo abrir tu almacén: esta partida no se guardará.',
     campana: 'Campaña', coleccion: 'Colección', equipo: 'Equipo', invocar: 'Invocar',
     monedas: 'Monedas', frags: 'Fragmentos', nivel: 'Nivel', nv: 'Nv',
     pelear: 'Pelear', volver: 'Volver', cerrar: 'Cerrar',
@@ -77,6 +78,7 @@ const STR = {
     elegir: 'Elegir',
   },
   en: {
+    storeProblem: 'Could not open your storage: this game will not be saved.',
     campana: 'Campaign', coleccion: 'Collection', equipo: 'Team', invocar: 'Summon',
     monedas: 'Coins', frags: 'Fragments', nivel: 'Level', nv: 'Lv',
     pelear: 'Fight', volver: 'Back', cerrar: 'Close',
