@@ -70,6 +70,13 @@ watchEffect(() => {
   tb.profileTheme = profileTheme;
 });
 
+// El estado del respaldo en la bóveda, a la vista en el botón de perfil (topbar ≥ 0.13).
+watchEffect(() => {
+  const tb = topbarRef.value;
+  if (!tb || !identityInst.value) return;
+  import('./store.js').then(m => m.storeHandle()).then(s => { if (s) tb.store = s; });
+});
+
 // El idioma lo manda el topbar (fuente de verdad); la app solo lo refleja.
 function onLang (e) { setLang(e.detail && e.detail.lang); }
 
