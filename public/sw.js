@@ -1,7 +1,9 @@
 // Service worker estándar del ecosistema (§3): navegación network-first (deploys
 // instantáneos; offline cae a caché), resto cache-first con refresco en segundo
 // plano. Subir N de CACHE en cada cambio de assets cacheados.
-const CACHE = 'critters-v54';
+const CACHE = 'critters-v55';
+// El timbre de Web Push del pilar (@dotrino/proxy-client): sin esto el push no despierta a nadie.
+importScripts('./dotrino-push-sw.js');
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {

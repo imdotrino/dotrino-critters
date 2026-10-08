@@ -1,7 +1,7 @@
 // Conexión única al proxy del ecosistema (dotrino-proxy-client). Al conectar nos
 // IDENTIFICAMOS con la clave del vault (identify firmado), habilitando la cola offline y el
 // ruteo por pubkey (necesario para los acuses de referido). Mismo patrón que messenger/diamonds.
-import { getWebSocketProxyClient } from '@dotrino/proxy-client';
+import { getWebSocketProxyClient, identitySealing } from '@dotrino/proxy-client';
 import { getIdentity } from './identity.js';
 
 const WS_URL = (import.meta.env && import.meta.env.VITE_WS_URL) || 'wss://proxy.dotrino.com';
@@ -12,7 +12,9 @@ let handlersReady = false;
 let myPublickey = null;
 
 export function getProxyClient () {
-  if (!client) client = getWebSocketProxyClient({ url: WS_URL });
+  // `requireSealed` desde el primer instante: el proxio no cifra (CONVENCIONES §4.1), y por
+  // aquí salen los acuses de referido, que dicen quién abrió el enlace de quién.
+  if (!client) client = getWebSocketProxyClient({ url: WS_URL, requireSealed: true });
   return client;
 }
 export function getMyPublickey () { return myPublickey; }
@@ -22,6 +24,12 @@ async function identifyWithVault (c) {
   const publickey = id && id.me && id.me.publickey;
   if (!id || !publickey || !c.token) return;
   try {
+    // La llave de cifrado ANTES del identify, que es quien la anuncia (firmada): sin ese
+    // anuncio nadie puede sellarnos un acuse. Quien sella es la bóveda, no la app.
+    c.updateConfig({
+      myEncPub: await id.getEncryptionPubkey(),
+      sealing: identitySealing(id, { app: 'critters' }),
+    });
     // El sobre lo arma el pilar (`identifyAs`), que además le pone el destinatario: quién
     // firma y para quién es no son cosa de cada app.
     await c.identifyAs({ publickey, sign: (d) => id.signData(d) });
