@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { execSync } from 'node:child_process'
+import prerender from '@dotrino/prerender/vite'
 
 // base './' → rutas relativas para servir bajo critters.dotrino.com (y el mirror
 // de Pages). Los Web Components del ecosistema (<dotrino-*>) se declaran como
@@ -19,6 +20,8 @@ function commitMeta () {
 
 export default defineConfig({
   base: './',
-  plugins: [commitMeta(), vue({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('dotrino-') } } })],
+  plugins: [
+    // El HTML llega con contenido para quien lo lee sin ejecutar JavaScript.
+    prerender(), commitMeta(), vue({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('dotrino-') } } })],
   server: { port: 3400, host: true },
 })
