@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import '@dotrino/theme/theme.css'
 import './style.css';
 import App from './App.vue';
 import { initAudio } from './sfx.js';

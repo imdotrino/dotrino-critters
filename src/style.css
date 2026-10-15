@@ -1,11 +1,10 @@
 /* ============================================================================
    Critters — "Bestiario Arcano": obsidiana + auras de energía, grano sutil,
-   acentos vibrantes por elemento. Display Bricolage, cuerpo Hanken, números mono.
-   Fuentes autohospedadas (sin hotlink a Google: filtra IP — ver CONVENCIONES).
+   acentos vibrantes por elemento. El juego es oscuro y sus colores son suyos; la
+   barra superior, las fuentes y los componentes son los del ecosistema
+   (@dotrino/theme, CONVENCIONES §5), y la barra sigue al tema claro u oscuro.
    ============================================================================ */
-@font-face { font-family:'Bricolage Grotesque'; src:url('/fonts/bricolage-grotesque.woff2') format('woff2'); font-weight:200 800; font-display:swap; }
-@font-face { font-family:'Hanken Grotesk'; src:url('/fonts/hanken-grotesk.woff2') format('woff2'); font-weight:100 900; font-display:swap; }
-@font-face { font-family:'JetBrains Mono'; src:url('/fonts/jetbrains-mono-400.woff2') format('woff2'); font-weight:400; font-display:swap; }
+#app > :not(dotrino-topbar) { color-scheme: dark; }
 
 :root{
   --ink:#070611;            /* fondo más profundo */
@@ -22,9 +21,9 @@
   --gold:#ffd24a;
   --good:#4ade80; --bad:#ff5d6c;
   --rad:16px;
-  --fdisplay:'Bricolage Grotesque', system-ui, sans-serif;
-  --fbody:'Hanken Grotesk', system-ui, sans-serif;
-  --fmono:'JetBrains Mono', ui-monospace, monospace;
+  --fdisplay:var(--dt-font-brand);
+  --fbody:var(--dt-font);
+  --fmono:var(--dt-font-mono);
   --el:#b794ff; --el2:#4c1d95; --rar:#9b93c7;   /* sobrescritos por carta */
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -52,20 +51,10 @@ button{font-family:inherit;cursor:pointer;color:inherit}
    viven en LIGHT DOM, vía slot). Nada de re-armar la barra a mano. */
 dotrino-topbar{
   flex:0 0 auto;
-  --dotrino-topbar-bg:linear-gradient(180deg, rgba(18,15,36,.92), rgba(18,15,36,.55));
-  --dotrino-topbar-border:var(--line);
-  --dotrino-topbar-text:var(--text);
-  --dotrino-topbar-muted:var(--muted);
-  --dotrino-topbar-accent:var(--accent2);
-  --dotrino-topbar-accent-text:#fff;
-  --dotrino-topbar-font:var(--fbody);
   --dotrino-topbar-pad:8px 12px;
   --dotrino-topbar-gap:8px;
 }
-/* La marca conserva el degradado arcano del juego (el componente expone ::part). */
-dotrino-topbar::part(brand-name){
-  font-family:var(--fdisplay);font-weight:800;font-size:20px;letter-spacing:.01em;
-  background:linear-gradient(95deg,#e9d5ff,#b794ff 45%,#38e1d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+dotrino-topbar::part(brand-name){font-family:var(--fdisplay);font-weight:800;font-size:20px;letter-spacing:.01em}
 dotrino-topbar::part(brand-icon){width:30px;height:30px;border-radius:0;filter:drop-shadow(0 2px 8px rgba(124,58,237,.6))}
 /* Acciones propias del juego dentro del slot 'end' (light DOM). */
 .tb-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -76,10 +65,10 @@ dotrino-topbar::part(brand-icon){width:30px;height:30px;border-radius:0;filter:d
 .brand span{font-family:var(--fdisplay);font-weight:800;font-size:20px;letter-spacing:.01em;
   background:linear-gradient(95deg,#e9d5ff,#b794ff 45%,#38e1d6);-webkit-background-clip:text;background-clip:text;color:transparent}
 .wallet{display:flex;gap:9px;font-family:var(--fmono);font-size:13px;font-weight:700}
-.wallet .coin{color:var(--gold)} .wallet .frag{color:var(--cyan)}
-.tb-btn{border:1px solid var(--line2);background:rgba(167,139,250,.08);color:var(--text);font-weight:800;font-size:12px;padding:6px 10px;border-radius:10px}
-.tb-btn:active{background:rgba(167,139,250,.2)}
-.cc-install{display:inline-flex;align-items:center;--cc-install-color:var(--text);--cc-install-icon:16px;--cc-install-radius:10px;--cc-install-font-size:.78rem}
+.wallet .coin{color:var(--dt-gold)} .wallet .frag{color:var(--dt-mint)}
+.tb-btn{border:1px solid var(--dt-line);background:var(--dt-surface-2);color:var(--dt-text);font-weight:800;font-size:12px;padding:6px 10px;border-radius:10px}
+.tb-btn:active{background:var(--dt-surface-3)}
+.cc-install{display:inline-flex;align-items:center;--cc-install-color:var(--dt-text);--cc-install-icon:16px;--cc-install-radius:10px;--cc-install-font-size:.78rem}
 
 /* ---- tabs (segmentado) ---- */
 .tabs{flex:0 0 auto;display:flex;gap:4px;padding:8px 10px;background:transparent}
@@ -186,7 +175,7 @@ dotrino-topbar::part(brand-icon){width:30px;height:30px;border-radius:0;filter:d
 .row-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
 
 /* ---- modal de borrado / overlay genérico ---- */
-.tb-btn.danger{border-color:rgba(255,93,108,.4);color:#ff8a96}
+.tb-btn.danger{border-color:var(--dt-error);color:var(--dt-error)}
 .overlay{position:fixed;inset:0;z-index:50;background:rgba(2,4,12,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px}
 .warn-card{background:var(--panel2);border:1px solid var(--bad);border-radius:16px;max-width:360px;width:100%;padding:20px;text-align:center;box-shadow:0 16px 50px rgba(0,0,0,.6)}
 .warn-card h2{font-family:var(--fdisplay);font-size:19px;margin-bottom:8px}

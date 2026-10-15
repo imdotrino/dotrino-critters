@@ -52,24 +52,10 @@ const topbarRef = ref(null);
 const identityInst = ref(null);
 const reputationInst = ref(null);
 
-// Modal de perfil con la paleta "Bestiario Arcano" del juego (vars --ccp-*).
-const profileTheme = {
-  '--ccp-bg': '#120f24', '--ccp-bg-2': '#1a1633', '--ccp-bg-3': '#241d44', '--ccp-bg-4': '#2e2554',
-  '--ccp-border': 'rgba(167,139,250,.30)', '--ccp-text': '#ece9ff', '--ccp-muted': '#9b93c7',
-  '--ccp-accent': '#8b5cf6', '--ccp-accent-2': '#7c3aed', '--ccp-accent-text': '#ffffff',
-  '--ccp-gold': '#ffd24a', '--ccp-derived': '#e0b03a',
-  '--ccp-online': '#4ade80', '--ccp-affinity': '#38e1d6',
-  '--ccp-input-bg': 'rgba(167,139,250,.08)', '--ccp-radius': '16px',
-  '--ccp-font': "'Hanken Grotesk', system-ui, sans-serif",
-  '--ccp-font-headline': "'Bricolage Grotesque', system-ui, sans-serif",
-  '--ccp-font-mono': "'JetBrains Mono', ui-monospace, monospace",
-};
-
 watchEffect(() => {
   const tb = topbarRef.value; if (!tb) return;
   tb.identity = identityInst.value ?? null;
   tb.reputation = reputationInst.value ?? null;
-  tb.profileTheme = profileTheme;
 });
 
 // El estado del respaldo en la bóveda, a la vista en el botón de perfil (topbar ≥ 0.13).
@@ -176,7 +162,7 @@ watch(() => ui.detailUid, (v) => { if (v) tutorialView('detail'); });
     icon="/icon.svg"
     brand-href="./"
     :lang.attr="i18n.lang"
-    profile
+    profile theme
     support-href="https://ko-fi.com/dotrino"
     support-repo="imdotrino/dotrino-critters"
     support-discord="https://discord.gg/D648uq7cth"
