@@ -1,44 +1,61 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { game, totalStars } from '../game/state.js';
+import { game, totalStars, campaignSeed } from '../game/state.js';
+/** @import { CampaignNode } from '../types.js' */
+/** @typedef {{ x: number, y: number }} XY */
 import { teamCount, isUnlocked } from '../game/actions.js';
 import { allNodes, edges, RING_GAP, zoneReqOf, zoneOpen, visibleNodeIds } from '../game/campaign.js';
 import { elementInfo } from '../critter/types.js';
 import { t, loc } from '../i18n.js';
 
 const emit = defineEmits(['fight', 'gated']);
-const nodes = computed(() => allNodes(game.seed));
+const nodes = computed(() => allNodes(campaignSeed()));
 const nmap = computed(() => Object.fromEntries(nodes.value.map(n => [n.id, n])));
-const E = computed(() => edges(game.seed));
+const E = computed(() => edges(campaignSeed()));
 
+/** @param {string} id */
 const cleared = (id) => game.cleared.includes(id);
+/** @param {string} id */
 const unlocked = (id) => isUnlocked(id);
-const visible = computed(() => visibleNodeIds(game.seed));
+const visible = computed(() => visibleNodeIds(campaignSeed()));
+/** @param {string} id */
 const isVisible = (id) => id === 'core' || visible.value.has(id);
+/** @param {string} id */
 const reqOf = (id) => zoneReqOf(nmap.value[id]);
+/** @param {string} id */
 const gated = (id) => { const n = nmap.value[id]; if (!n || id === 'core' || cleared(id)) return false; return reqOf(id) > 0 && !zoneOpen(n); };
+/** @param {string} id */
 const access = (id) => cleared(id) || unlocked(id);
+/** @param {CampaignNode} n */
 const nodeCls = (n) => ({ core: n.id === 'core', boss: n.boss, cleared: cleared(n.id), open: unlocked(n.id) && !cleared(n.id), gated: gated(n.id), locked: !unlocked(n.id) && !cleared(n.id) && !gated(n.id) });
+/** @param {string} id */
 const starsOf = (id) => (game.stars && game.stars[id]) || 0;
+/** @param {string} id */
 const starStr = (id) => '★'.repeat(starsOf(id)) + '☆'.repeat(3 - starsOf(id));
 const shownNodes = computed(() => nodes.value.filter(n => isVisible(n.id)));
 const shownEdges = computed(() => E.value.filter(e => isVisible(e[0]) && isVisible(e[1])));
 
 const NR = 22, BR = 26, CR = 28;     // radios de nodo (unidades de mundo)
+/** @param {CampaignNode} n */
 const nodeR = (n) => (n.id === 'core' ? CR : (n.boss ? BR : NR));
+/** @param {CampaignNode} n */
 const terrainColor = (n) => (n.terrain ? elementInfo(n.terrain).color : null);
+/** @param {CampaignNode} n */
 const terrainShow = (n) => (n.terrain && isVisible(n.id)) ? elementInfo(n.terrain).color : null;
+/** @param {CampaignNode} n @returns {Record<string, string>} */
+const dotStyle = (n) => { const c = terrainShow(n); return c ? { stroke: c } : {}; };
 
 // Vista paneable que LLENA todo el área: el viewBox toma el aspecto del contenedor
 // (la dimensión menor muestra ~3.4 anillos; la mayor muestra más) → sin recorte ni
 // franjas vacías. Se mide el SVG y se recalcula al redimensionar.
 const BASE = 3.4 * RING_GAP;         // mundo visible en la dimensión MENOR
-const svgEl = ref(null);
+const svgEl = ref(/** @type {SVGSVGElement | null} */ (null));
 const vw = ref(BASE), vh = ref(BASE);
 const zoom = ref(1);                  // >1 acerca, <1 aleja (rueda / pinch)
 const panX = ref(0), panY = ref(0);
 const viewBox = computed(() => `${(panX.value - vw.value / 2).toFixed(1)} ${(panY.value - vh.value / 2).toFixed(1)} ${vw.value.toFixed(1)} ${vh.value.toFixed(1)}`);
 function measure () { const el = svgEl.value; if (!el) return; const r = el.getBoundingClientRect(); const m = Math.min(r.width, r.height) || 1; const b = BASE / zoom.value; vw.value = b * ((r.width || m) / m); vh.value = b * ((r.height || m) / m); }
+/** @param {number} z */
 function setZoom (z) { zoom.value = Math.max(0.4, Math.min(3, z)); measure(); saveView(); }
 
 // Recordar posición (pan) y zoom entre sesiones.
@@ -59,27 +76,38 @@ onMounted(() => { const had = loadView(); measure(); if (!had) recenter(); windo
 onUnmounted(() => window.removeEventListener('resize', onResize));
 
 // Pan (1 dedo/arrastre) + PINCH (2 dedos) + rueda. tap (sin mover) sobre un nodo = pelear.
+/** @type {Map<number, XY>} */
 const pointers = new Map();
-let panStart = null, pinchStart = null, movedFlag = false;
+/** @type {{ sx: number, sy: number, px: number, py: number } | null} */
+let panStart = null;
+/** @type {{ dist: number, zoom: number } | null} */
+let pinchStart = null;
+let movedFlag = false;
 const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+/** @param {PointerEvent} e */
 function onDown (e) {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); movedFlag = false;
   if (pointers.size === 1) { panStart = { sx: e.clientX, sy: e.clientY, px: panX.value, py: panY.value }; pinchStart = null; }
   else if (pointers.size === 2) { pinchStart = { dist: pinchDist() || 1, zoom: zoom.value }; panStart = null; }
 }
+/** @param {PointerEvent} e */
 function onMove (e) {
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2 && pinchStart) { setZoom(pinchStart.zoom * (pinchDist() / pinchStart.dist)); movedFlag = true; }
   else if (panStart) {
-    const w = svgEl.value.clientWidth || 1, k = vw.value / w;
+    // Se arrastra SOBRE el svg: está montado.
+    const w = /** @type {SVGSVGElement} */ (svgEl.value).clientWidth || 1, k = vw.value / w;
     const dx = e.clientX - panStart.sx, dy = e.clientY - panStart.sy;
     if (Math.hypot(dx, dy) > 4) movedFlag = true;
     panX.value = panStart.px - dx * k; panY.value = panStart.py - dy * k;
   }
 }
+/** @param {PointerEvent} e */
 function onUp (e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinchStart = null; if (pointers.size === 0) panStart = null; }
+/** @param {WheelEvent} e */
 function onWheel (e) { setZoom(zoom.value * (e.deltaY < 0 ? 1.12 : 1 / 1.12)); }
+/** @param {CampaignNode} n */
 function play (n) {
   if (movedFlag) { movedFlag = false; return; }
   if (unlocked(n.id)) emit('fight', n.id);
@@ -90,9 +118,17 @@ function play (n) {
 // bordes son los bisectores (PUNTOS MEDIOS entre niveles). Se pintan las celdas con terreno
 // (las neutrales quedan sin pintar) → zonas contiguas que envuelven áreas enteras de niveles.
 const TERR_MARGIN = 1.3 * RING_GAP;
+/**
+ * @param {XY[]} poly
+ * @param {XY} P
+ * @param {XY} Q
+ * @returns {XY[]}
+ */
 function clipHalf (poly, P, Q) {   // recorta `poly` al semiplano más cercano a P que a Q (Sutherland–Hodgman)
   const mx = (P.x + Q.x) / 2, my = (P.y + Q.y) / 2, nx = Q.x - P.x, ny = Q.y - P.y;
+  /** @param {XY} p */
   const side = (p) => (p.x - mx) * nx + (p.y - my) * ny;   // <= 0 → lado de P
+  /** @type {XY[]} */
   const out = [];
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length], da = side(a), db = side(b);
@@ -106,6 +142,7 @@ const terrainCells = computed(() => {
   let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity;
   for (const n of ns) { if (n.x < mnx) mnx = n.x; if (n.y < mny) mny = n.y; if (n.x > mxx) mxx = n.x; if (n.y > mxy) mxy = n.y; }
   const box = [{ x: mnx - TERR_MARGIN, y: mny - TERR_MARGIN }, { x: mxx + TERR_MARGIN, y: mny - TERR_MARGIN }, { x: mxx + TERR_MARGIN, y: mxy + TERR_MARGIN }, { x: mnx - TERR_MARGIN, y: mxy + TERR_MARGIN }];
+  /** @type {{ key: string, color: string, points: string }[]} */
   const out = [];
   for (const P of ns) {
     if (!P.terrain || !isVisible(P.id)) continue;
@@ -119,8 +156,9 @@ const terrainCells = computed(() => {
 // opacidad plena → las celdas del MISMO terreno se funden sin costura (sin bordes internos); solo
 // quedan los límites entre terrenos distintos.
 const terrainGroups = computed(() => {
+  /** @type {Map<string, string[]>} */
   const m = new Map();
-  for (const c of terrainCells.value) { if (!m.has(c.color)) m.set(c.color, []); m.get(c.color).push(c.points); }
+  for (const c of terrainCells.value) { let g = m.get(c.color); if (!g) { g = []; m.set(c.color, g); } g.push(c.points); }
   return [...m.entries()].map(([color, polys]) => ({ color, polys }));
 });
 </script>
@@ -139,7 +177,7 @@ const terrainGroups = computed(() => {
             class="thread" :class="{ on: access(e[0]) && access(e[1]) }" />
       <g v-for="n in shownNodes" :key="n.id" class="node" :class="nodeCls(n)" @click="play(n)">
         <circle :cx="n.x" :cy="n.y" :r="nodeR(n) + 9" fill="transparent" />
-        <circle :cx="n.x" :cy="n.y" :r="nodeR(n)" class="dot" :style="terrainShow(n) ? { stroke: terrainShow(n) } : {}" />
+        <circle :cx="n.x" :cy="n.y" :r="nodeR(n)" class="dot" :style="dotStyle(n)" />
         <text v-if="n.id !== 'core'" :x="n.x" :y="n.y + 6" class="lab">{{ access(n.id) ? (n.boss ? '★' : n.diff) : '🔒' }}</text>
         <text v-else :x="n.x" :y="n.y + 7" class="lab">◆</text>
         <text v-if="cleared(n.id)" :x="n.x" :y="n.y - nodeR(n) - 7" class="nstars">{{ starStr(n.id) }}</text>

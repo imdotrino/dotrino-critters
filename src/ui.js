@@ -2,6 +2,7 @@
 // Se abre tocando el avatar en cualquier vista (colección, equipo) — nunca en pelea.
 import { reactive } from 'vue';
 
-export const ui = reactive({ detailUid: null });
+export const ui = reactive({ detailUid: /** @type {string | null} */ (null) });
+/** @param {string | null | undefined} uid */
 export function openCritter (uid) { if (uid) ui.detailUid = uid; }
 export function closeCritter () { ui.detailUid = null; }

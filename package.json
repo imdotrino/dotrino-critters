@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test": "vitest run",
-    "type-check": "tsc --noEmit"
+    "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@dotrino/identity": "0.117.2",
@@ -37,6 +37,7 @@
     "@vitejs/plugin-vue": "^6.0.2",
     "typescript": "5.9.3",
     "vite": "^7.3.1",
-    "vitest": "4.1.8"
+    "vitest": "4.1.8",
+    "vue-tsc": "3.3.13"
   }
 }

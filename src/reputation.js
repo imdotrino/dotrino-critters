@@ -5,6 +5,7 @@
 import { createVaultReputation } from '@dotrino/reputation';
 import { getIdentity } from './identity.js';
 
+/** @type {import('@dotrino/reputation').VaultReputation | null} */
 let _rep = null;
 
 /** Instancia compartida de reputación (o null si no hay vault). */

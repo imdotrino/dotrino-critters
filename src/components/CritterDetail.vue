@@ -12,7 +12,7 @@ import { t, loc } from '../i18n.js';
 
 // Perfil + configuración de UNA criatura. Se abre tocando su avatar en cualquier
 // vista (colección, equipo) — nunca en pelea. Separado en pestañas.
-const props = defineProps({ uid: String });
+const props = defineProps({ uid: { type: String, required: true } });
 const emit = defineEmits(['close']);
 
 const inst = computed(() => instanceByUid(props.uid));
@@ -21,7 +21,7 @@ const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110) : '
 // En el PERFIL el 3D es la PERSPECTIVA animada (beauty1/beauty2), al lado del círculo;
 // el círculo conserva el esquema SVG y la circunferencia gira mientras se genera.
 const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => genomeOf(inst.value), { views: ['beauty1', 'beauty2'] });
-const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
+const stats = computed(() => (critter.value && inst.value) ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
 const passiveInfo = computed(() => critter.value ? PASSIVES[critter.value.passive] : null);
@@ -31,6 +31,7 @@ const elInfo = computed(() => critter.value ? elementInfo(critter.value.element)
 // Composición de INGREDIENTES (multiset de bases con multiplicidad) → barra + leyenda.
 const ingredients = computed(() => {
   const c = critter.value; if (!c) return [];
+  /** @type {Record<string, number>} */
   const counts = {}; for (const k of comps(c.element)) if (ELEMENT_INFO[k]) counts[k] = (counts[k] || 0) + 1;
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
   return ['fuego', 'agua', 'planta'].filter(b => counts[b]).map(b => ({ key: b, n: counts[b], pct: Math.round(100 * counts[b] / total), info: ELEMENT_INFO[b] }));
@@ -51,10 +52,16 @@ const TABS = [
 const tab = ref('stats');
 
 const err = ref('');
+/** @typedef {import('../types.js').StatKey} StatKey */
+/** @param {StatKey} s */
 const allocOf = (s) => { const i = inst.value; return (i && i.alloc && i.alloc[s]) || 0; };
+/** @param {StatKey} s */
 function incPt (s) { adjustAlloc(props.uid, s, 1); }
+/** @param {StatKey} s */
 function decPt (s) { adjustAlloc(props.uid, s, -1); }
 function resetPts () { resetAlloc(props.uid); }
+/** @param {Event} e */
+function onNick (e) { setNick(props.uid, /** @type {HTMLInputElement} */ (e.target).value); }
 function doFeed () { const r = feed(props.uid); err.value = (r && r.error === 'frags') ? t('sinFrags') : ''; }
 
 // COMBATE: dos selecciones simples con NOMBRE.
@@ -68,13 +75,15 @@ watch(() => props.uid, () => {
   objSel.value = objPrimary(inst.value && inst.value.target, role);
   tab.value = 'stats';
 }, { immediate: true });
+/** @param {string} k */
 function pickRol (k) { if (k === rolSel.value) return; rolSel.value = k; setRol(props.uid, k); }
+/** @param {string} k */
 function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarget(props.uid, k); }
 </script>
 
 <template>
   <div class="detail-modal" @click.self="emit('close')">
-    <div class="detail-card" v-if="critter">
+    <div class="detail-card" v-if="inst && critter && stats">
       <div class="d-portrait">
         <!-- Círculo = la hormiga SVG. A la DERECHA, la ÚNICA imagen 3D que conservamos: la
              perspectiva animada (patas en movimiento), bajo demanda, en cuanto existe. -->
@@ -85,7 +94,7 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
       </div>
       <h2 style="margin-top:4px">{{ displayName(inst, critter) }}</h2>
-      <input class="nick-in" :value="inst.nick || ''" :placeholder="t('apodoPh') + ' (' + critter.name + ')'" maxlength="16" @change="e => setNick(uid, e.target.value)" :title="t('apodo')" />
+      <input class="nick-in" :value="inst.nick || ''" :placeholder="t('apodoPh') + ' (' + critter.name + ')'" maxlength="16" @change="onNick" :title="t('apodo')" />
       <div class="chips" style="justify-content:center;margin:6px 0 4px">
         <span class="chip">{{ t('nv') }}{{ inst.level }}</span>
         <span v-if="rar" class="chip" :style="{ color: rar.color, borderColor: rar.color }">{{ loc(rar) }}</span>

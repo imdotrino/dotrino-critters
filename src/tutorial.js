@@ -18,6 +18,7 @@
 import { createTutorial } from '@dotrino/tutorial';
 import { i18n } from './i18n.js';
 
+/** @param {number} ms */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Tema acorde a la paleta del juego (tinta/violeta/cian) — variables del componente.
@@ -44,6 +45,7 @@ const I18N = {
 // Definición de pasos por sección. target usa data-testid estables ya presentes
 // (o agregados) en los *View.vue. placement es solo preferencia: la librería lo
 // voltea si no entra y hace clamp al viewport (nunca se sale de pantalla).
+/** @type {Record<string, { storageKey: string, steps: import('@dotrino/tutorial').CcTutorialStep[] }>} */
 const SECTIONS = {
   // INICIAL — elegir la primera criatura (pantalla previa al juego).
   starter: {
@@ -268,11 +270,14 @@ const SECTIONS = {
 };
 
 // Instancias perezosas (una por sección). Se crean al primer onView de la sección.
+/** @type {Record<string, import('@dotrino/tutorial').DotrinoTutorial | null>} */
 const instances = Object.create(null);
 // Evita lanzar dos veces en la misma sesión (la persistencia ya evita repetir
 // entre sesiones; esto solo ahorra trabajo si la vista se monta varias veces).
+/** @type {Record<string, boolean>} */
 const started = Object.create(null);
 
+/** @param {string} name */
 function build (name) {
   const def = SECTIONS[name];
   if (!def) return null;

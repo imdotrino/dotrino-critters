@@ -15,12 +15,16 @@
 import { elementInfo } from './types.js';
 import { RARITY_BY_KEY, formKey, seedOfId } from './forge.js';
 import { rngFrom } from '../lib/rng.js';
+/** @import { Critter } from '../types.js' */
+/** @typedef {number[]} Pt  un punto [x, y] */
 
+/** @param {string} hex @param {number} f */
 function darken (hex, f) {
   const n = parseInt(hex.slice(1), 16);
   const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
+/** @param {string} hex @param {number} deg */
 function shift (hex, deg) {
   const n = parseInt(hex.slice(1), 16);
   let r = (n >> 16) & 255, b = n & 255; const g = (n >> 8) & 255;
@@ -31,18 +35,25 @@ function shift (hex, deg) {
 }
 
 // ---- geometría caligráfica: TODO en cubic beziers, ni una arista dura ----------
+/** @param {number} n */
 const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1);   // 1 decimal estable
+/** @param {number} x @param {number} y @returns {Pt} */
 const P = (x, y) => [x, y];
+/** @param {Pt} p */
 const Mv = (p) => 'M' + f1(p[0]) + ',' + f1(p[1]);
+/** @param {Pt} c1 @param {Pt} c2 @param {Pt} b */
 const Cc = (c1, c2, b) => 'C' + f1(c1[0]) + ',' + f1(c1[1]) + ' ' + f1(c2[0]) + ',' + f1(c2[1]) + ' ' + f1(b[0]) + ',' + f1(b[1]);
+/** @param {Pt} p */
 const Ll = (p) => 'L' + f1(p[0]) + ',' + f1(p[1]);
 
 // Cubic Bézier: punto y tangente unitaria en t∈[0,1] (para poner el ancho del trazo
 // perpendicular a la curva, y para orientar el pie/garra).
+/** @param {Pt} p0 @param {Pt} p1 @param {Pt} p2 @param {Pt} p3 @param {number} t @returns {Pt} */
 function bez (p0, p1, p2, p3, t) {
   const u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
   return [a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]];
 }
+/** @param {Pt} p0 @param {Pt} p1 @param {Pt} p2 @param {Pt} p3 @param {number} t @returns {Pt} */
 function bezTan (p0, p1, p2, p3, t) {
   const u = 1 - t;
   const dx = 3 * u * u * (p1[0] - p0[0]) + 6 * u * t * (p2[0] - p1[0]) + 3 * t * t * (p3[0] - p2[0]);
@@ -51,6 +62,7 @@ function bezTan (p0, p1, p2, p3, t) {
 }
 // Suaviza una polilínea como cadena de cubics (1/3 de la tangente local) → orillas del
 // trazo sin quiebres, \"tinta\" continua.
+/** @param {Pt[]} poly */
 function smoothEdge (poly) {
   let d = '';
   for (let i = 1; i < poly.length; i++) {
@@ -64,9 +76,14 @@ function smoothEdge (poly) {
 
 /** TRAZO DE TINTA afilado sobre una curva cubic: path CERRADO (orilla externa ida +
  *  orilla interna vuelta) cuyo ancho va de w0 (cadera) a w1 (pie), con un \"vientre\"
- *  caligráfico (belly>1) que engrosa hacia el centro. Da la pata/antena/quelícero. */
+ *  caligráfico (belly>1) que engrosa hacia el centro. Da la pata/antena/quelícero.
+ * @param {Pt} p0 @param {Pt} p1 @param {Pt} p2 @param {Pt} p3
+ * @param {number} w0 @param {number} w1 @param {number} [belly] @param {number} [N] */
 function inkTaper (p0, p1, p2, p3, w0, w1, belly = 1, N = 10) {
-  const Lp = [], Rp = [];
+  /** @type {Pt[]} */
+  const Lp = [];
+  /** @type {Pt[]} */
+  const Rp = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     const c = bez(p0, p1, p2, p3, t);
@@ -81,7 +98,9 @@ function inkTaper (p0, p1, p2, p3, w0, w1, belly = 1, N = 10) {
 
 /** Lóbulo en GOTA / huevo por 4 cubics. cx,cy centro; w medio-ancho; up alto hacia
  *  arriba; dn hacia abajo; tip>0 estira y afila la punta inferior (aguijón). squash<1
- *  achata lados (cabeza ancha); >1 estiliza (cuña/mantis). */
+ *  achata lados (cabeza ancha); >1 estiliza (cuña/mantis).
+ * @param {number} cx @param {number} cy @param {number} w @param {number} up @param {number} dn
+ * @param {number} [tip] @param {number} [squash] */
 function teardrop (cx, cy, w, up, dn, tip = 0, squash = 1) {
   const k = 0.5523, kx = w * k, ky = up * k, kyB = dn * k;
   const top = P(cx, cy - up), bot = P(cx, cy + dn + tip);
@@ -97,7 +116,8 @@ function teardrop (cx, cy, w, up, dn, tip = 0, squash = 1) {
 
 /** ÓVALO / huevo por 4 cubics: redondeado en AMBOS extremos (sin punta ni hendidura),
  *  ancho máximo en el centro. up/dn = cuánto sube/baja desde cy. Para el abdomen bulboso
- *  (evita la silueta de "corazón" que dejaba el teardrop). */
+ *  (evita la silueta de "corazón" que dejaba el teardrop).
+ * @param {number} cx @param {number} cy @param {number} w @param {number} up @param {number} dn */
 function oval (cx, cy, w, up, dn) {
   const k = 0.5523, kU = up * k, kD = dn * k, kw = w * k;
   const top = P(cx, cy - up), bot = P(cx, cy + dn), rgt = P(cx + w, cy), lft = P(cx - w, cy);
@@ -109,9 +129,11 @@ function oval (cx, cy, w, up, dn) {
 }
 
 // ---- geometría RECTA (parte "angular" del híbrido) ------------------------------
+/** @param {Pt[]} arr */
 const poly = (arr) => Mv(arr[0]) + arr.slice(1).map(Ll).join('') + 'Z';
 /** Trazo RECTO afilado (trapecio): de p0 (ancho w0) a p1 (ancho w1), aristas rectas.
- *  Es el FÉMUR recto de la pata híbrida y el cuello/espina rectos. */
+ *  Es el FÉMUR recto de la pata híbrida y el cuello/espina rectos.
+ * @param {Pt} p0 @param {Pt} p1 @param {number} w0 @param {number} w1 */
 function straightTaper (p0, p1, w0, w1) {
   let dx = p1[0] - p0[0], dy = p1[1] - p0[1]; const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
   const nx = -dy, ny = dx;
@@ -121,11 +143,18 @@ function straightTaper (p0, p1, w0, w1) {
   ]);
 }
 /** Placa hexagonal de caparazón (aristas RECTAS) para cabeza/tórax angulares. */
+/** @param {number} cx @param {number} cy @param {number} w @param {number} up @param {number} dn */
 const hexPlate = (cx, cy, w, up, dn) => poly([
   [cx, cy - up], [cx + w, cy - up * 0.40], [cx + w, cy + dn * 0.40],
   [cx, cy + dn], [cx - w, cy + dn * 0.40], [cx - w, cy - up * 0.40],
 ]);
 
+/**
+ * @param {Pick<Critter, 'element' | 'rarity'> & { appearance?: Critter['appearance'], id?: string, name?: string }} critter
+ * @param {number} [size]
+ * @param {{ walk?: boolean, frame?: boolean }} [opts]
+ * @returns {string}
+ */
 export function critterSvg (critter, size = 96, opts = {}) {
   const a = critter.appearance || { head: 0, thorax: -1, abdomen: -1, legs: 4, legStyle: 1, antennae: true, hue: 0, pattern: 0 };
   const ei = elementInfo(critter.element);
@@ -146,6 +175,7 @@ export function critterSvg (critter, size = 96, opts = {}) {
 
   // jitter caligráfico determinista: misma FORMA+tono ⇒ mismo trazo (byte-idéntico)
   const rng = rngFrom('skin:' + formKey(a) + ':' + (a.hue || 0));
+  /** @param {number} amp */
   const jit = (amp) => (rng() - 0.5) * 2 * amp;
 
   const hasTh = (a.thorax ?? -1) >= 0, hasAb = (a.abdomen ?? -1) >= 0;
@@ -156,9 +186,11 @@ export function critterSvg (critter, size = 96, opts = {}) {
   // combina. legCells = índices de bit en 1; L = cuántas.
   const LEG_CELLS = [[0, -1], [0, 1], [1, -1], [1, 1], [2, -1], [2, 1]];
   const _mask = (a.legs | 0) & 63;
+  /** @type {number[]} */
   const legCells = []; for (let c = 0; c < 6; c++) if (_mask & (1 << c)) legCells.push(c);
   const L = legCells.length;
   const segYs = [y0]; if (hasTh) segYs.push(y1); if (hasAb) segYs.push(y2);   // segmentos REALES presentes (y de cada uno)
+  /** @param {number} yy */
   const nearestSeg = (yy) => { let best = segYs[0], bd = Infinity; for (const sy of segYs) { const d = Math.abs(sy - yy); if (d < bd) { bd = d; best = sy; } } return best; };
 
   // =========================================================================
@@ -228,9 +260,11 @@ export function critterSvg (critter, size = 96, opts = {}) {
   }
 
   // lóbulo CURVO (bezier): relleno gradiente + borde + leve sheen radial (juicy) → abdomen
+  /** @param {string} d @param {boolean} withSheen */
   const lobe = (d, withSheen) => '<path d=\"' + d + '\" fill=\"url(#' + uid + ')\" stroke=\"' + edge + '\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/>'
     + (withSheen ? '<path d=\"' + d + '\" fill=\"url(#' + uid + 's)\" stroke=\"none\"/>' : '');
   // placa ANGULAR (aristas rectas, esquinas en pico) → cabeza/tórax del caparazón
+  /** @param {string} d @param {boolean} withSheen */
   const plate = (d, withSheen) => '<path d=\"' + d + '\" fill=\"url(#' + uid + ')\" stroke=\"' + edge + '\" stroke-width=\"1.6\" stroke-linejoin=\"miter\"/>'
     + (withSheen ? '<path d=\"' + d + '\" fill=\"url(#' + uid + 's)\" stroke=\"none\"/>' : '');
 
@@ -302,6 +336,7 @@ export function critterSvg (critter, size = 96, opts = {}) {
   const eyeY = a.head === 1 ? y0 - 3 : a.head === 3 ? y0 - 6 : y0 - 7;
   const eyeSp = a.head === 1 ? 3.0 : a.head === 3 ? 5.6 : 5.0;
   const eyeBig = a.head === 1 ? 0.72 : a.head === 3 ? 1.05 : 1;
+  /** @param {number} ex @param {number} sc */
   const eye = (ex, sc) =>
     '<circle cx=\"' + f1(ex) + '\" cy=\"' + f1(eyeY) + '\" r=\"' + f1(3.4 * sc) + '\" fill=\"#05040c\"/>' +
     '<circle cx=\"' + f1(ex - 1.0 * sc) + '\" cy=\"' + f1(eyeY - 1.1 * sc) + '\" r=\"' + f1(1.0 * sc) + '\" fill=\"' + glow + '\"/>';

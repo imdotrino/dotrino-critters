@@ -2,12 +2,17 @@
 // navegador — cero assets, cero red, sin repetición. Autohosteado y liviano.
 // Cada SFX se arma con tonos (osciladores con envolvente/sweep) y ruido filtrado.
 const LS = 'critters_sfx';
-let actx = null, master = null;
+/** @type {AudioContext | null} */
+let actx = null;
+/** @type {GainNode | null} */
+let master = null;
 let muted = (() => { try { return localStorage.getItem(LS) === '0'; } catch { return false; } })();
 
+/** @returns {AudioContext | null} */
 function ctx () {
   if (!actx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
+    // Safari viejo solo trae el prefijado.
+    const AC = window.AudioContext || /** @type {{ webkitAudioContext?: typeof AudioContext }} */ (window).webkitAudioContext;
     if (!AC) return null;
     actx = new AC();
     master = actx.createGain(); master.gain.value = 0.45; master.connect(actx.destination);
@@ -17,15 +22,20 @@ function ctx () {
 }
 
 export function isMuted () { return muted; }
+/** @param {boolean} m */
 export function setMuted (m) { muted = !!m; try { localStorage.setItem(LS, muted ? '0' : '1'); } catch {} }
 export function toggleMuted () { setMuted(!muted); return muted; }
 // Desbloquea el audio en el primer gesto del usuario (políticas de autoplay).
 export function initAudio () { const r = () => { try { ctx(); } catch {} window.removeEventListener('pointerdown', r); }; window.addEventListener('pointerdown', r, { once: true }); }
 
+/** @param {number} a @param {number} b */
 const rnd = (a, b) => a + Math.random() * (b - a);
 
+/**
+ * @param {{ freq?: number, to?: number, dur?: number, type?: OscillatorType, gain?: number, at?: number, delay?: number }} opts
+ */
 function tone ({ freq = 440, to, dur = 0.12, type = 'triangle', gain = 0.3, at = 0.004, delay = 0 }) {
-  const c = ctx(); if (!c) return;
+  const c = ctx(); if (!c || !master) return;
   const t0 = c.currentTime + delay;
   const o = c.createOscillator(), g = c.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, t0);
@@ -37,8 +47,11 @@ function tone ({ freq = 440, to, dur = 0.12, type = 'triangle', gain = 0.3, at =
   o.start(t0); o.stop(t0 + dur + 0.02);
 }
 
+/**
+ * @param {{ dur?: number, gain?: number, type?: BiquadFilterType, freq?: number, q?: number, to?: number, delay?: number }} opts
+ */
 function noise ({ dur = 0.1, gain = 0.3, type = 'highpass', freq = 1200, q = 0.8, to, delay = 0 }) {
-  const c = ctx(); if (!c) return;
+  const c = ctx(); if (!c || !master) return;
   const t0 = c.currentTime + delay;
   const n = Math.floor(c.sampleRate * dur);
   const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
@@ -55,6 +68,7 @@ function noise ({ dur = 0.1, gain = 0.3, type = 'highpass', freq = 1200, q = 0.8
 
 // ---- SFX del juego ----
 let _lastHit = 0;
+/** @param {boolean} [crit] */
 export function hit (crit) {
   if (muted) return;
   const now = (actx ? actx.currentTime : 0);

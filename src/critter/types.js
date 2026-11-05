@@ -5,6 +5,7 @@
 // se reactivan. typeMultiplier es agnóstico al tamaño del anillo.
 export const ELEMENTS = ['fuego', 'agua', 'planta'];
 
+/** @type {Record<string, { es: string, en: string, color: string, color2: string }>} */
 export const ELEMENT_INFO = {
   fuego:  { es: 'Fuego',  en: 'Fire',      color: '#f97316', color2: '#7c2d12' },
   agua:   { es: 'Agua',   en: 'Water',     color: '#38bdf8', color2: '#075985' },
@@ -43,14 +44,25 @@ export const DIS = 0.93;   // multiplicador con desventaja
 // DEGRADAR (la araña baja de rareza y pierde lo que ya no cabe).
 
 // `comps`: TODAS las bases del elemento (aplana "+" y "."). Lo usan nombre/combate/stats.
+/**
+ * @param {unknown} el
+ * @returns {string[]}
+ */
 export const comps = (el) => String(el).split(/[+.]/);
 // Subelemento = más de UN elemento base DISTINTO (fuego+fuego NO es sub: es puro acumulado).
+/** @param {unknown} el */
 export const isSub = (el) => new Set(comps(el).filter(c => ELEMENTS.includes(c))).size > 1;
 
 // nº de bases de UN ingrediente (string dot-joined) = su "tamaño" (1, 2, 4…). nivel = log2+1.
+/** @param {string} ing */
 const ingSize = (ing) => String(ing).split('.').filter(b => ELEMENTS.includes(b)).length;
 // Agrupa los ingredientes del elemento por TAMAÑO (= nivel), preservando el orden FIFO.
+/**
+ * @param {unknown} el
+ * @returns {Record<number, string[]>}
+ */
 function parseQueues (el) {
+  /** @type {Record<number, string[]>} */
   const q = {};
   for (const ing of String(el).split('+')) {
     const s = ing.split('.').filter(b => ELEMENTS.includes(b)).join('.');
@@ -61,6 +73,7 @@ function parseQueues (el) {
   return q;
 }
 // Vuelve a string: tamaños ascendentes, FIFO dentro de cada tamaño. 'fuego' si quedó vacío.
+/** @param {Record<number, string[]>} q */
 function serializeQueues (q) {
   const out = [];
   for (const sz of Object.keys(q).map(Number).sort((a, b) => a - b)) for (const ing of q[sz]) out.push(ing);
@@ -70,11 +83,17 @@ function serializeQueues (q) {
 /** FUSIÓN de ingredientes (determinista). `maxNivel` = capacidad de la araña RESULTANTE
  *  (1 base / 2 sub / 3 sub-sub). Empareja por nivel (posicional, FIFO), de complejo a simple;
  *  una pareja promueve al nivel siguiente SOLO si ese nivel ≤ maxNivel; si no, no se empareja y
- *  los componentes quedan en su cola. NO descarta (eso es la devolución). */
+ *  los componentes quedan en su cola. NO descarta (eso es la devolución).
+ * @param {string} elA
+ * @param {string} elB
+ * @param {number} maxNivel
+ * @returns {string} */
 export function fuseIngredients (elA, elB, maxNivel) {
   const maxSize = 1 << (Math.max(1, maxNivel | 0) - 1);   // nivel 1/2/3 → tamaño 1/2/4
   const qa = parseQueues(elA), qb = parseQueues(elB);
+  /** @type {Record<number, string[]>} */
   const res = {};
+  /** @param {number} sz @param {string} ing */
   const push = (sz, ing) => { (res[sz] = res[sz] || []).push(ing); };
   const sizes = [...new Set([...Object.keys(qa), ...Object.keys(qb)].map(Number))].sort((a, b) => b - a);
   for (const sz of sizes) {                                  // de MAYOR a menor (complejo→simple)
@@ -92,10 +111,15 @@ export function fuseIngredients (elA, elB, maxNivel) {
 }
 
 /** DEVOLUCIÓN: une los ingredientes de ambas y DESCARTA los que superan `maxNivel` (la araña
- *  bajó de rareza y ya no caben). No promueve. */
+ *  bajó de rareza y ya no caben). No promueve.
+ * @param {string} elA
+ * @param {string} elB
+ * @param {number} maxNivel
+ * @returns {string} */
 export function degradeIngredients (elA, elB, maxNivel) {
   const maxSize = 1 << (Math.max(1, maxNivel | 0) - 1);
   const q = parseQueues(elA + '+' + elB);
+  /** @type {Record<number, string[]>} */
   const kept = {};
   for (const sz of Object.keys(q).map(Number)) if (sz <= maxSize) kept[sz] = q[sz];
   return serializeQueues(kept);
@@ -103,11 +127,19 @@ export function degradeIngredients (elA, elB, maxNivel) {
 
 // COMPAT: unión PLANA de bases (sin estructura). Ya no la usa la fusión nueva; se conserva por
 // si algún consumidor viejo la necesita.
+/**
+ * @param {string} a
+ * @param {string} b
+ */
 export function mixElements (a, b) {
   const cs = comps(a).concat(comps(b)).filter(c => ELEMENTS.includes(c)).sort();
   return (cs.length ? cs : ['fuego']).join('+');
 }
 
+/**
+ * @param {string} att
+ * @param {string} def
+ */
 function baseMult (att, def) {
   const n = ELEMENTS.length;
   const i = ELEMENTS.indexOf(att), j = ELEMENTS.indexOf(def);
@@ -119,7 +151,10 @@ function baseMult (att, def) {
 }
 /** Multiplicador de daño att→def. Soporta SUBELEMENTOS: el subelemento toma las
  *  VENTAJAS de ambos sin sumar debilidades (atacando elige su mejor componente;
- *  defendiendo, su mejor resistencia) → max_a min_d baseMult(a,d). */
+ *  defendiendo, su mejor resistencia) → max_a min_d baseMult(a,d).
+ * @param {string} att
+ * @param {string} def
+ * @returns {number} */
 export function typeMultiplier (att, def) {
   const A = comps(att), D = comps(def);
   let best = -Infinity;
@@ -127,12 +162,15 @@ export function typeMultiplier (att, def) {
   return best === -Infinity ? 1 : best;
 }
 
-const hx = (h) => { h = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) || 0); };
+/** @param {unknown} h */
+const hx = (h) => { const s = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16) || 0); };
+/** @param {number} r @param {number} g @param {number} b */
 const rgbHex = (r, g, b) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
 // Catálogo de 36 NOMBRES alusivos a la combinación + intensidad (acumulación):
 // 3 bases × 4 · 3 subelementos × 6 · 1 triple × 6 = 36. La clave es el conjunto de
 // ingredientes DISTINTOS (canónico, ordenado); el índice es cuánto se acumuló.
+/** @type {Record<string, [string, string][]>} */
 const ELEMENT_NAMES = {
   // bases (4 intensidades)
   fuego:  [['Brasa', 'Ember'], ['Llama', 'Flame'], ['Hoguera', 'Bonfire'], ['Infierno', 'Inferno']],
@@ -147,7 +185,9 @@ const ELEMENT_NAMES = {
 };
 
 /** Etiqueta/colores de un elemento: NOMBRE del catálogo (combinación + intensidad por
- *  acumulación); color promediado por proporción de ingredientes. */
+ *  acumulación); color promediado por proporción de ingredientes.
+ * @param {unknown} el
+ * @returns {{ es: string, en: string, color: string, color2: string, sub?: boolean, intensity?: number, distinct?: string[] }} */
 export function elementInfo (el) {
   const all = comps(el).filter(c => ELEMENT_INFO[c]);
   if (!all.length) return ELEMENT_INFO.fuego;

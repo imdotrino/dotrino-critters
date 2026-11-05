@@ -6,11 +6,17 @@ import { getIdentity } from './identity.js';
 
 const WS_URL = (import.meta.env && import.meta.env.VITE_WS_URL) || 'wss://proxy.dotrino.com';
 
+/** @import { WebSocketProxyClient } from '@dotrino/proxy-client' */
+
+/** @type {WebSocketProxyClient | null} */
 let client = null;
+/** @type {Promise<WebSocketProxyClient> | null} */
 let connecting = null;
 let handlersReady = false;
+/** @type {string | null} */
 let myPublickey = null;
 
+/** @returns {WebSocketProxyClient} */
 export function getProxyClient () {
   // `requireSealed` desde el primer instante: el proxio no cifra (CONVENCIONES §4.1), y por
   // aquí salen los acuses de referido, que dicen quién abrió el enlace de quién.
@@ -19,6 +25,7 @@ export function getProxyClient () {
 }
 export function getMyPublickey () { return myPublickey; }
 
+/** @param {WebSocketProxyClient} c */
 async function identifyWithVault (c) {
   const id = await getIdentity();
   const publickey = id && id.me && id.me.publickey;
@@ -37,6 +44,7 @@ async function identifyWithVault (c) {
   } catch (e) { console.warn('identify (vault) failed:', e); }
 }
 
+/** @param {WebSocketProxyClient} c */
 function setupHandlers (c) {
   if (handlersReady) return;
   handlersReady = true;
@@ -44,7 +52,10 @@ function setupHandlers (c) {
   c.on('token', () => { identifyWithVault(c).catch(() => {}); });
 }
 
-/** Conecta (una sola vez) y se identifica con el vault. Idempotente. Best-effort. */
+/**
+ * Conecta (una sola vez) y se identifica con el vault. Idempotente. Best-effort.
+ * @returns {Promise<WebSocketProxyClient>}
+ */
 export function ensureConnected () {
   const c = getProxyClient();
   if (c.isConnected) return Promise.resolve(c);

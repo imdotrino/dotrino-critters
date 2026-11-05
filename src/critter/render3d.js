@@ -18,6 +18,9 @@ const INTAKE = 'https://render.dotrino.com/';
 const RETRY_MS = 12000;    // re-chequea si la imagen ya existe cada ~12s (el render tarda ~60-90s)
 const STEP_MS = 360;       // ms por frame a speed 1 (la cadencia escala con speed)
 
+/** @import { Instance } from '../types.js' */
+
+/** @param {string} id @returns {Promise<string>} */
 async function keyOf (id) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -25,6 +28,10 @@ async function keyOf (id) {
 
 // Genoma CANÓNICO de una instancia (misma apariencia que el SVG): para que TODA hormiga
 // pueda renderizar, no solo las de fusión (g:...). El seed va saneado al formato del genoma.
+/**
+ * @param {Pick<Instance, 'id'> | null | undefined} inst
+ * @returns {string}
+ */
 export function genomeOf (inst) {
   const id = inst && inst.id;
   if (!id) return '';
@@ -34,8 +41,10 @@ export function genomeOf (inst) {
   return genomeId({ ...c, seed });
 }
 
+/** @type {Set<string>} */
 const queued = new Set();   // no reencolar el mismo id dentro de la sesión
 let reqseq = 0;             // contador para el cache-buster del intake
+/** @param {string} id @param {string[]} views */
 function requestRender (id, views) {
   const k = id + ':' + views.join(',');
   if (queued.has(k)) return;
@@ -48,17 +57,26 @@ function requestRender (id, views) {
   }).then(r => { if (!r.ok) queued.delete(k); }).catch(() => queued.delete(k));
 }
 
+/** @param {string} u @returns {Promise<string>} */
 const preload = (u) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(u); im.onerror = rej; im.src = u; });
 
 // Icono animado: alterna `views` (por defecto los 2 frames top) a una cadencia ~STEP_MS/speed.
 // Devuelve { src, ready, pending }: <img v-show="ready" :src="src">; gira mientras pending && !ready.
 // animate=false: precarga TODOS los frames (los deja cacheados para la animación de la
 // batalla) pero muestra solo el 1º fijo (círculos). animate=true: alterna los frames.
+/**
+ * @param {() => string | null | undefined} idGetter
+ * @param {{ views?: string[], animate?: boolean }} [opts]
+ */
 export function use3dRender (idGetter, { views = ['top1', 'top2'], animate: doAnimate = true } = {}) {
   const src = ref('');
   const ready = ref(false);
   const pending = ref(false);
-  let curId = '', urls = [], frame = 0, timer = null, attempt = 0;
+  let curId = '', frame = 0, attempt = 0;
+  /** @type {string[]} */
+  let urls = [];
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let timer = null;
 
   const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
 
@@ -76,6 +94,10 @@ export function use3dRender (idGetter, { views = ['top1', 'top2'], animate: doAn
     if (order.length > 1) timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));
   }
 
+  /**
+   * @param {string | null | undefined} id
+   * @param {boolean} [first]
+   */
   async function begin (id, first) {
     stop(); ready.value = false; pending.value = false; src.value = '';
     if (first) { curId = id || ''; attempt = 0; }

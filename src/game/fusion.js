@@ -13,8 +13,14 @@
 import { partsOf, genomeId, makeCritter, MAX_PARTS, capacityFor, rarityIndexFromParts, seedOfId, legCount } from '../critter/forge.js';
 import { fuseIngredients, degradeIngredients } from '../critter/types.js';
 import { hash32 } from '../lib/hash.js';
+/** @import { Appearance, Critter } from '../types.js' */
+/** @typedef {'merge' | 'evolve' | 'degrade'} FuseKind */
 
 // Piezas que cada apariencia tiene y la otra NO (patas anidadas + tórax + abdomen).
+/**
+ * @param {Appearance} a
+ * @param {Appearance} b
+ */
 function pieceDiff (a, b) {
   // patas: por CELDA (máscara). Las que A tiene y B no = popcount(a & ~b).
   const la = (a.legs | 0) & 63, lb = (b.legs | 0) & 63;
@@ -22,10 +28,14 @@ function pieceDiff (a, b) {
   const onlyB = legCount(lb & ~la) + (b.thorax >= 0 && a.thorax < 0 ? 1 : 0) + (b.abdomen >= 0 && a.abdomen < 0 ? 1 : 0);
   return { onlyA, onlyB };
 }
+/** @param {Critter} cA @param {Critter} cB */
 const bigger = (cA, cB) => (partsOf(cA.appearance) >= partsOf(cB.appearance) ? cA : cB);
 // Unión (todas las piezas de ambas) e intersección (solo las comunes).
+/** @param {Appearance} a @param {Appearance} b @returns {Appearance} */
 function unionApp (a, b) { return { ...a, thorax: a.thorax >= 0 ? a.thorax : (b.thorax >= 0 ? b.thorax : -1), abdomen: a.abdomen >= 0 ? a.abdomen : (b.abdomen >= 0 ? b.abdomen : -1), legs: ((a.legs | 0) | (b.legs | 0)) & 63 }; }
+/** @param {Appearance} a @param {Appearance} b @returns {Appearance} */
 function interApp (a, b) { return { ...a, thorax: (a.thorax >= 0 && b.thorax >= 0) ? a.thorax : -1, abdomen: (a.abdomen >= 0 && b.abdomen >= 0) ? a.abdomen : -1, legs: ((a.legs | 0) & (b.legs | 0)) & 63 }; }
+/** @param {Critter} cA @param {Critter} cB */
 const fuseSeed = (cA, cB) => 's' + ((hash32(cA.id + '|' + cB.id) >>> 0).toString(36));
 
 /** Tipo de fusión por la CANTIDAD de partes en que DIFIEREN las dos (NO por rareza):
@@ -33,7 +43,10 @@ const fuseSeed = (cA, cB) => 's' + ((hash32(cA.id + '|' + cB.id) >>> 0).toString
  *   1 diferencia  → 'evolve' (la chica se completa hacia la grande → unión)
  *   2 diferencias → 'degrade'(devolución → intersección)
  *   3+ diferencias→ null     (incompatibles)
- * La rareza (nº de partes) NO condiciona; solo cuenta la diferencia de partes. */
+ * La rareza (nº de partes) NO condiciona; solo cuenta la diferencia de partes.
+ * @param {Critter | null | undefined} cA
+ * @param {Critter | null | undefined} cB
+ * @returns {FuseKind | null} */
 export function fuseKind (cA, cB) {
   if (!cA || !cB || cA.id === cB.id) return null;
   const { onlyA, onlyB } = pieceDiff(cA.appearance, cB.appearance);
@@ -49,9 +62,15 @@ export function fuseKind (cA, cB) {
   // DEVOLUCIÓN. Si difieren por 2 (p.ej. cabeza vs cabeza-tórax-pata) → INCOMPATIBLE.
   return (onlyA + onlyB) === 1 ? 'degrade' : null;
 }
+/** @param {Critter | null | undefined} cA @param {Critter | null | undefined} cB */
 export const canFuse = (cA, cB) => fuseKind(cA, cB) !== null;
 
-/** Resultado determinista de fusionar A y B (evolucionar / reforzar / devolucionar). */
+/**
+ * Resultado determinista de fusionar A y B (evolucionar / reforzar / devolucionar).
+ * @param {Critter} cA
+ * @param {Critter} cB
+ * @returns {Critter | null}
+ */
 export function fuse (cA, cB) {
   const kind = fuseKind(cA, cB);
   if (!kind) return null;
@@ -60,6 +79,7 @@ export function fuse (cA, cB) {
   const diff = onlyA + onlyB;
   let app, element, seed;
   // capacidad (nivel máx de ingrediente) según la rareza de la araña RESULTANTE.
+  /** @param {Appearance} a */
   const cap = (a) => capacityFor(rarityIndexFromParts(partsOf(a)));
   if (kind === 'merge') {                                                  // idénticas → MISMA araña + ingredientes mezclados (+ XP)
     app = { ...big.appearance };

@@ -17,23 +17,30 @@ const BASE = 'https://critters.dotrino.com/';
 const LS_REF = 'critters_referrals';
 const LS_CONSUMED = 'critters_consumed';
 
+/** @type {Set<string>} */
 let _set = new Set();        // referidos (invitador)
+/** @type {Set<string>} */
 let _consumed = new Set();   // links consumidos (consumidor)
+/** @typedef {(c: { referidos: number, consumidos: number }) => void} ChangeListener */
+/** @type {ChangeListener} */
 let _onChange = () => {};
+/** @type {import('@dotrino/notifications').ShareReceipts | null} */
 let _receipts = null;
 
 export function referralCount () { return _set.size; }
 export function consumedCount () { return _consumed.size; }
+/** @param {ChangeListener | null | undefined} fn */
 export function onReferralsChange (fn) { _onChange = fn || (() => {}); }
 function emit () { try { _onChange({ referidos: _set.size, consumidos: _consumed.size }); } catch {} }
 
 function loadLocal () {
-  try { const a = JSON.parse(localStorage.getItem(LS_REF)); if (Array.isArray(a)) _set = new Set(a); } catch {}
-  try { const a = JSON.parse(localStorage.getItem(LS_CONSUMED)); if (Array.isArray(a)) _consumed = new Set(a); } catch {}
+  try { const a = JSON.parse(localStorage.getItem(LS_REF) || 'null'); if (Array.isArray(a)) _set = new Set(a); } catch {}
+  try { const a = JSON.parse(localStorage.getItem(LS_CONSUMED) || 'null'); if (Array.isArray(a)) _consumed = new Set(a); } catch {}
 }
 function saveSet () { try { localStorage.setItem(LS_REF, JSON.stringify([..._set])); } catch {} }
 function saveConsumed () { try { localStorage.setItem(LS_CONSUMED, JSON.stringify([..._consumed])); } catch {} }
 
+/** @param {string | null | undefined} pk */
 function addReferral (pk) {
   if (!pk || _set.has(pk)) return;
   _set.add(pk); saveSet();
@@ -41,6 +48,7 @@ function addReferral (pk) {
   try { grantShareReward('referral'); } catch {}
   emit();
 }
+/** @param {string | null | undefined} pk */
 function addConsumed (pk) {
   if (!pk || _consumed.has(pk)) return false;
   _consumed.add(pk); saveConsumed();
@@ -50,6 +58,7 @@ function addConsumed (pk) {
   return true;
 }
 
+/** @returns {import('@dotrino/notifications').ShareReceipts} */
 function receipts () {
   if (!_receipts) {
     _receipts = createShareReceipts({

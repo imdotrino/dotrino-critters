@@ -4,6 +4,7 @@ import { chooseStarter } from '../game/actions.js';
 import { t } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
+/** @param {string} id */
 function choose (id) { chooseStarter(id); }
 </script>
 

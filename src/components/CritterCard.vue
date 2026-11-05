@@ -7,7 +7,11 @@ import { elementInfo } from '../critter/types.js';
 import { ROLE_INFO } from '../critter/roles.js';
 import { t, loc } from '../i18n.js';
 
-const props = defineProps({ instance: Object, size: { type: Number, default: 92 }, stats: { type: Boolean, default: true } });
+const props = defineProps({
+  instance: { type: /** @type {import('vue').PropType<import('../types.js').CardInstance>} */ (Object), required: true },
+  size: { type: Number, default: 92 },
+  stats: { type: Boolean, default: true },
+});
 const critter = computed(() => critterById(props.instance.id));
 const svg = computed(() => critterSvg(critter.value, props.size));
 const st = computed(() => statsAtLevel(critter.value, props.instance.level || 1, props.instance.alloc));
@@ -17,7 +21,9 @@ const el = computed(() => elementInfo(critter.value.element));
 const role = computed(() => ROLE_INFO[critter.value.role]);
 
 // Referencia de las barras (≈ valores fuertes de media partida; el endgame satura al 100%).
+/** @type {import('../types.js').Stats} */
 const CAP = { HP: 1200, ATK: 480, DEF: 300, SPD: 340 };
+/** @param {import('../types.js').StatKey} k */
 const w = (k) => Math.max(6, Math.min(100, Math.round(100 * st.value[k] / CAP[k]))) + '%';
 </script>
 

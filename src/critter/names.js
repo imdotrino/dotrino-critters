@@ -21,7 +21,13 @@ const RACE = [
   /* 6 */     ['Tejedor',    'Imponente',  'Viuda',        'Titán'],
 ];
 
-/** Raza (nombre) determinística por el ESQUELETO: (tórax?, abdomen?, nº de patas). */
+/**
+ * Raza (nombre) determinística por el ESQUELETO: (tórax?, abdomen?, nº de patas).
+ * @param {boolean} hasThorax
+ * @param {boolean} hasAbdomen
+ * @param {number} legCount
+ * @returns {string}
+ */
 export function raceName (hasThorax, hasAbdomen, legCount) {
   const seg = (hasThorax ? 1 : 0) + (hasAbdomen ? 2 : 0);
   const lg = Math.max(0, Math.min(6, legCount | 0));

@@ -8,11 +8,21 @@ import { elementInfo } from '../critter/types.js';
 import { pointsFree } from '../critter/forge.js';
 import { t } from '../i18n.js';
 
+/** @import { Lineup } from '../types.js' */
+/** @typedef {{ type: 'lineup', id: string, slot: number } | { type: 'bench' }} DragSource */
+/** @typedef {string | null | undefined} Uid */
+
+/** @param {Uid} uid */
 const critterFor = (uid) => { const i = instanceByUid(uid); return i ? critterById(i.id) : null; };
+/** @param {Uid} uid @param {number} size */
 const svgFor = (uid, size) => { const c = critterFor(uid); return c ? critterSvg(c, size) : ''; };
+/** @param {Uid} uid */
 const elColor = (uid) => { const c = critterFor(uid); return c ? elementInfo(c.element).color : 'var(--line)'; };
+/** @param {Uid} uid */
 const levelOf = (uid) => { const i = instanceByUid(uid); return i ? i.level : null; };
+/** @param {Uid} uid */
 const freePts = (uid) => { const i = instanceByUid(uid); return i ? pointsFree(i.level, i.alloc) : 0; };
+/** @param {Lineup} lu */
 const countOf = (lu) => lu.team.filter(Boolean).length;
 
 // Banquillo = arañas que NO están en NINGUNA alineación.
@@ -20,11 +30,24 @@ const inAny = computed(() => { const s = new Set(); for (const l of game.lineups
 const bench = computed(() => game.collection.filter(c => !inAny.value.has(c.uid)));
 
 // ---- drag & drop (puntero) entre alineaciones y banquillo ----
-const drag = reactive({ active: false, uid: null, source: null, x: 0, y: 0, pending: null });
-const over = ref(null);   // { lineup, slot } resaltado
+const drag = reactive({
+  active: false,
+  uid: /** @type {string | null} */ (null),
+  source: /** @type {DragSource | null} */ (null),
+  x: 0, y: 0,
+  pending: /** @type {{ uid: string, source: DragSource, sx: number, sy: number } | null} */ (null),
+});
+const over = ref(/** @type {{ lineup: string | undefined, slot: number } | null} */ (null));   // resaltado
+/** @param {string} lid @param {number} slot */
 const dragging = (lid, slot) => drag.active && drag.source && drag.source.type === 'lineup' && drag.source.id === lid && drag.source.slot === slot;
+/** @param {string} lid @param {number} slot */
 const isOver = (lid, slot) => over.value && over.value.lineup === lid && over.value.slot === slot;
 
+/**
+ * @param {PointerEvent} e
+ * @param {Uid} uid
+ * @param {DragSource} source
+ */
 function onDown (e, uid, source) {
   if (!uid) return;
   e.preventDefault();
@@ -33,6 +56,7 @@ function onDown (e, uid, source) {
   window.addEventListener('pointermove', onMove, { passive: false });
   window.addEventListener('pointerup', onUp);
 }
+/** @param {PointerEvent} e */
 function onMove (e) {
   if (!drag.pending) return;
   drag.x = e.clientX; drag.y = e.clientY;
@@ -42,15 +66,16 @@ function onMove (e) {
   }
   e.preventDefault();
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  const cell = el && el.closest && el.closest('[data-slot]');
+  const cell = el && el.closest && /** @type {HTMLElement | null} */ (el.closest('[data-slot]'));
   over.value = cell ? { lineup: cell.dataset.lineup, slot: Number(cell.dataset.slot) } : null;
 }
+/** @param {PointerEvent} e */
 function onUp (e) {
   window.removeEventListener('pointermove', onMove);
   window.removeEventListener('pointerup', onUp);
   if (drag.active) {
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    const cell = el && el.closest && el.closest('[data-slot]');
+    const cell = el && el.closest && /** @type {HTMLElement | null} */ (el.closest('[data-slot]'));
     if (cell) applyDrop(cell.dataset.lineup, Number(cell.dataset.slot));
     else applyDrop(null, null);   // fuera / banquillo → sacar de la alineación origen
   } else if (drag.pending) {
@@ -61,13 +86,19 @@ function onUp (e) {
 function reset () { drag.active = false; drag.uid = null; drag.source = null; drag.pending = null; over.value = null; }
 onUnmounted(() => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); });
 
+/**
+ * @param {string | null | undefined} targetLid
+ * @param {number | null} targetSlot
+ */
 function applyDrop (targetLid, targetSlot) {
   const uid = drag.uid, src = drag.source;
+  // Solo se suelta con un arrastre activo, que siempre tiene origen.
+  if (!src) return;
   if (targetLid == null) {                       // soltó fuera o en el banquillo
     if (src.type === 'lineup') { const l = game.lineups.find(x => x.id === src.id); if (l) { l.team[src.slot] = null; persist(); } }
     return;
   }
-  const tl = game.lineups.find(l => l.id === targetLid); if (!tl) return;
+  const tl = game.lineups.find(l => l.id === targetLid); if (!tl || targetSlot == null) return;
   if (src.type === 'lineup' && src.id === targetLid) {   // reordenar dentro de la misma alineación
     const occ = tl.team[targetSlot]; tl.team[targetSlot] = uid; tl.team[src.slot] = occ;
   } else {                                                // desde banquillo u otra alineación → agregar (puede estar en varias)
@@ -88,7 +119,7 @@ function applyDrop (targetLid, targetSlot) {
     <div v-for="lu in game.lineups" :key="lu.id" class="lineup" :class="{ act: lu.id === game.activeLineup }">
       <div class="lu-row">
         <button class="lu-use" :class="{ on: lu.id === game.activeLineup }" @click="setActiveLineup(lu.id)">{{ lu.id === game.activeLineup ? '★ ' + t('enUso') : '☆ ' + t('usar') }}</button>
-        <input class="lu-name" :value="lu.name" @change="e => renameLineup(lu.id, e.target.value)" maxlength="20" />
+        <input class="lu-name" :value="lu.name" @change="(/** @type {Event} */ e) => renameLineup(lu.id, /** @type {HTMLInputElement} */ (e.target).value)" maxlength="20" />
         <span class="lu-count">{{ countOf(lu) }}/{{ TEAM_MAX }}</span>
         <button class="lu-del" @click="deleteLineup(lu.id)" :disabled="game.lineups.length <= 1" title="🗑">🗑</button>
       </div>

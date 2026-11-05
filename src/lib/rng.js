@@ -2,6 +2,15 @@
 // que cualquier id/semilla produzca siempre la misma secuencia.
 import { hash32 } from './hash.js';
 
+/**
+ * Un número en [0, 1).
+ * @typedef {() => number} Rng
+ */
+
+/**
+ * @param {number} a
+ * @returns {Rng}
+ */
 export function mulberry32 (a) {
   return function () {
     a |= 0; a = a + 0x6D2B79F5 | 0;
@@ -11,16 +20,37 @@ export function mulberry32 (a) {
   };
 }
 
-/** RNG a partir de un string semilla. */
+/**
+ * RNG a partir de un string semilla.
+ * @param {unknown} seedStr
+ * @returns {Rng}
+ */
 export function rngFrom (seedStr) { return mulberry32(hash32(String(seedStr))); }
 
-/** Entero en [min, max] inclusive. */
+/**
+ * Entero en [min, max] inclusive.
+ * @param {Rng} rng
+ * @param {number} min
+ * @param {number} max
+ */
 export function rint (rng, min, max) { return min + ((rng() * (max - min + 1)) | 0); }
 
-/** Elemento al azar de un array. */
+/**
+ * Elemento al azar de un array.
+ * @template T
+ * @param {Rng} rng
+ * @param {readonly T[]} arr
+ * @returns {T}
+ */
 export function pick (rng, arr) { return arr[(rng() * arr.length) | 0]; }
 
-/** Selección ponderada: entries = [[item, peso], ...]. */
+/**
+ * Selección ponderada: entries = [[item, peso], ...].
+ * @template T
+ * @param {Rng} rng
+ * @param {[T, number][]} entries
+ * @returns {T}
+ */
 export function weighted (rng, entries) {
   let total = 0; for (const e of entries) total += e[1];
   let r = rng() * total;

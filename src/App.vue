@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, watchEffect, onMounted } from 'vue';
+import { ref, shallowRef, computed, watch, watchEffect, onMounted } from 'vue';
 import { game, loadGame, resetGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
 import { i18n, t, setLang } from './i18n.js';
@@ -18,6 +18,9 @@ import BattleView from './components/BattleView.vue';
 import EncounterView from './components/EncounterView.vue';
 import CritterDetail from './components/CritterDetail.vue';
 import StarterView from './components/StarterView.vue';
+/** @import { FightResult } from './types.js' */
+/** @import { BackLayerHandle } from '@dotrino/nav' */
+/** @import { DotrinoTopbar } from '@dotrino/topbar' */
 
 const needsStarter = computed(() => game.ready && game.collection.length === 0);
 
@@ -25,7 +28,9 @@ const tab = ref('campana');
 // Navegación por pestañas como capas de nav: cambiar de tab deja un registro, así
 // el back/chevron vuelve al tab anterior; a dotrino.com solo se sale desde el home
 // (campaña) cuando ya no hay registros que deshacer.
+/** @type {BackLayerHandle[]} */
 let tabLayers = [];
+/** @param {string} to */
 function goTab (to) {
   if (to === tab.value) return;
   const from = tab.value;
@@ -33,12 +38,14 @@ function goTab (to) {
   tabLayers.push(h);
   tab.value = to;
 }
-const battle = ref(null);
+const battle = ref(/** @type {FightResult | null} */ (null));
 const showReset = ref(false);
 const sfxMuted = ref(sfxIsMuted());
 function toggleSfx () { sfxMuted.value = sfxToggle(); }
 const toast = ref('');
-let toastT = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let toastT;
+/** @param {string} m @param {number} [ms] */
 function showToast (m, ms = 1900) { toast.value = m; clearTimeout(toastT); toastT = setTimeout(() => { toast.value = ''; }, ms); }
 // Si el almacén no abre, la partida sigue pero NO se guarda: se dice (store.js, sin repliegue).
 import('./store.js').then(({ onStoreProblem }) => onStoreProblem(() => showToast('⚠ ' + t('storeProblem'), 8000)));
@@ -48,9 +55,10 @@ import('./store.js').then(({ onStoreProblem }) => onStoreProblem(() => showToast
 // componente compartido: la app no lo reimplementa. Solo le pasa sus acciones
 // propias por slot y los pilares que ya maneja (identidad + reputación) para
 // que abra él mismo el modal "Mi perfil" (§6.1).
-const topbarRef = ref(null);
-const identityInst = ref(null);
-const reputationInst = ref(null);
+const topbarRef = ref(/** @type {DotrinoTopbar | null} */ (null));
+// Fuera del Proxy reactivo de Vue: la identidad habla con su iframe por postMessage.
+const identityInst = shallowRef(/** @type {import('@dotrino/identity').Identity | null} */ (null));
+const reputationInst = shallowRef(/** @type {import('@dotrino/reputation').VaultReputation | null} */ (null));
 
 watchEffect(() => {
   const tb = topbarRef.value; if (!tb) return;
@@ -66,24 +74,28 @@ watchEffect(() => {
 });
 
 // El idioma lo manda el topbar (fuente de verdad); la app solo lo refleja.
-function onLang (e) { setLang(e.detail && e.detail.lang); }
+/** @param {CustomEvent<{ lang?: string }>} e */
+function onLang (e) { setLang(String(e.detail && e.detail.lang)); }
 
 // Enlace de invitación en el botón de compartir (recompensa por compartir, §12).
 // La moneda de support ahora vive DENTRO del shadow DOM del topbar y este la
 // recrea en cada render suyo (idioma/avatar), así que `share-url` se re-aplica
 // con un observer: el topbar 0.3.0 no expone un passthrough del atributo.
+/** @type {MutationObserver | null} */
 let shareObs = null;
+/** @param {DotrinoTopbar} tb */
 async function wireShareUrl (tb) {
   if (shareObs || !tb || !tb.shadowRoot) return;
+  const root = tb.shadowRoot;
   const link = await inviteLink().catch(() => null);
   if (!link || !topbarRef.value) return;
   const apply = () => {
-    const s = tb.shadowRoot.querySelector('dotrino-support');
+    const s = root.querySelector('dotrino-support');
     if (s && s.getAttribute('share-url') !== link) s.setAttribute('share-url', link);
   };
   apply();
   shareObs = new MutationObserver(apply);
-  shareObs.observe(tb.shadowRoot, { childList: true, subtree: true });
+  shareObs.observe(root, { childList: true, subtree: true });
 }
 // El topbar no existe en la pantalla inicial (StarterView), así que se cablea
 // cuando aparece, no en onMounted.
@@ -98,17 +110,23 @@ onMounted(async () => {
 // La batalla es una "capa" de navegación: el back físico / chevron la cierran y
 // vuelven a la pantalla del juego (NO a dotrino.com). Una sola vía: cerrar la
 // batalla = pop de la capa (nav.back) → su callback baja la UI.
+/** @type {BackLayerHandle | null} */
 let battleNav = null;
 function closeBattleUI () {
   const cap = battle.value && battle.value.captured;
   battle.value = null; battleNav = null;
   if (cap) showToast('✨ ' + t('capturaste'));
 }
+/** @param {string} n */
 function fight (n) {
   const r = fightCampaign(n);
   if (r.error === 'noteam') { showToast(t('equipoVacio')); return; }
+  // Otro error (nodo bloqueado o inexistente) dejaba la batalla con `{ error }` y una
+  // pantalla rota. No se pelea, y queda dicho.
+  if (r.error !== undefined) { console.warn('[critters] cannot fight:', r.error); return; }
   battle.value = r;   // si ya había batalla (Siguiente), reusa la misma capa
 }
+/** @param {string} n */
 function onNext (n) { fight(n); }
 function onCloseRequest () { if (battleNav) nav.back(); else closeBattleUI(); }
 watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBattleUI()); });
@@ -116,15 +134,18 @@ watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBatt
 // Modal de ENCUENTRO (previo a pelear): clic en un nivel lo abre; "Pelear" lanza la
 // batalla. Modal simple (cierra con Cancelar/afuera) para no chocar con la navegación
 // asíncrona del back al abrir la batalla.
-const encounter = ref(null);
+const encounter = ref(/** @type {string | null} */ (null));
+/** @param {string} n */
 function onFightRequest (n) { encounter.value = n; }
 // Nodo bloqueado por GATE de terreno: toast con las estrellas que faltan (no abre el encuentro).
-function onGated ({ need, have }) { showToast(t('gateFaltan').replace('{n}', Math.max(0, need - have))); }
+/** @param {{ need: number, have: number }} g */
+function onGated ({ need, have }) { showToast(t('gateFaltan').replace('{n}', String(Math.max(0, need - have)))); }
 function onEncounterClose () { encounter.value = null; }
-function startEncounter () { const id = encounter.value; encounter.value = null; fight(id); }
+function startEncounter () { const id = encounter.value; encounter.value = null; if (id) fight(id); }
 
 // Perfil/config de criatura: también es una capa de nav (el back lo cierra). Se abre
 // tocando un avatar en colección o equipo (nunca en pelea).
+/** @type {BackLayerHandle | null} */
 let detailNav = null;
 function closeDetailUI () { closeCritter(); detailNav = null; }
 function onDetailClose () { if (detailNav) nav.back(); else closeDetailUI(); }

@@ -8,24 +8,32 @@ import { RARITY_BY_KEY, statsAtLevel } from '../critter/forge.js';
 import { critterSvg } from '../critter/svg.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
+/** @import { Instance, Critter } from '../types.js' */
 
+/** @param {Instance | null} inst */
 const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58) : '';
+/** @param {Instance | null} inst */
 const nameOf = (inst) => inst ? displayName(inst, critterById(inst.id)) : '';
 // Ingredientes (bases con multiplicidad) de un descriptor → [{key,n,info}].
+/** @param {Critter | null} critter */
 const ingOf = (critter) => {
   if (!critter) return [];
+  /** @type {Record<string, number>} */
   const counts = {}; for (const k of comps(critter.element)) if (ELEMENT_INFO[k]) counts[k] = (counts[k] || 0) + 1;
   return ['fuego', 'agua', 'planta'].filter(b => counts[b]).map(b => ({ key: b, n: counts[b], info: ELEMENT_INFO[b] }));
 };
+/** @param {Instance | null} inst */
 const critOf = (inst) => inst ? critterById(inst.id) : null;
 
-const selA = ref(null);
-const selB = ref(null);
+const selA = ref(/** @type {string | null} */ (null));
+const selB = ref(/** @type {string | null} */ (null));
 
 const instA = computed(() => selA.value ? instanceByUid(selA.value) : null);
 const instB = computed(() => selB.value ? instanceByUid(selB.value) : null);
 const others = computed(() => game.collection.filter(i => i.uid !== selA.value));
+/** @param {string} uid */
 const compatOf = (uid) => isCompatibleFuse(selA.value, uid);
+/** @param {string} uid */
 const kindOf = (uid) => fuseKindOf(selA.value, uid);   // 'evolve'|'merge'|'degrade'|null
 const kind = computed(() => (selA.value && selB.value) ? fuseKindOf(selA.value, selB.value) : null);
 const preview = computed(() => (selA.value && selB.value) ? fusePreview(selA.value, selB.value) : null);
@@ -50,6 +58,7 @@ const subLabel = computed(() => {
   return '';
 });
 
+/** @param {string} uid */
 function choose (uid) {
   if (!selA.value) { selA.value = uid; selB.value = null; return; }
   if (uid === selA.value) return;
@@ -95,7 +104,7 @@ function doFuse () {
       <div class="fst-col res" v-if="prevStats"><span class="fst-h">=</span><span>❤ {{ prevStats.HP }}</span><span>⚔ {{ prevStats.ATK }}</span><span>🛡 {{ prevStats.DEF }}</span><span>⚡ {{ prevStats.SPD }}</span></div>
     </div>
 
-    <div v-if="preview" class="prev-info">
+    <div v-if="preview && prevEl && prevRar" class="prev-info">
       <div><b :style="{ color: prevEl.color }">{{ preview.name }}</b>
         <span class="dot">·</span> {{ loc(prevEl) }}
         <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span></div>

@@ -10,14 +10,23 @@ import { SPEEDS, speed, setSpeed, PLAYBACK } from '../speed.js';
 import { elementInfo } from '../critter/types.js';
 import { t, loc } from '../i18n.js';
 
-const props = defineProps({ payload: Object });
+/** @import { FightResult, UnitSnap, LogEntry } from '../types.js' */
+/**
+ * Una araña tal como se ve en la repetición.
+ * @typedef {UnitSnap & { hp: number, dead: boolean, flash: boolean, dmg: number | null | undefined, dmgClass: string, face: number, energy: number, cost: number, lastAct: number, cy: number }} LiveUnit
+ */
+
+const props = defineProps({ payload: { type: /** @type {import('vue').PropType<FightResult>} */ (Object), required: true } });
 const emit = defineEmits(['close', 'next']);
 
+/** @type {Record<string, LiveUnit>} */
 const U = reactive({});           // uid → estado vivo
-const list = ref([]);             // uids para render
+const list = ref(/** @type {string[]} */ ([]));             // uids para render
 const finished = ref(false);
 const modalHidden = ref(false);   // "Ver campo": oculta el modal de resultado
-let alive = true, ended = false, rafId = 0, idx = 0, clock = 0, lastTs = 0, endTimer = null;
+let alive = true, ended = false, rafId = 0, idx = 0, clock = 0, lastTs = 0;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let endTimer;
 
 // Replay POR CICLOS: el reloj avanza en ciclos de simulación (no por evento). Cada evento
 // trae su `cyc` (tick) y se reproduce cuando el reloj lo alcanza → los tiempos reflejan los
@@ -29,13 +38,16 @@ const res = () => props.payload.result;
 function initUnits () {
   for (const k in U) delete U[k];
   for (const u of res().units) {
-    const cost = (ACTIVES[critterById(u.id).active] || {}).cost || 100;
+    const cost = ACTIVES[critterById(u.id).active]?.cost || 100;
     U[u.uid] = { ...u, hp: u.maxHp, dead: false, flash: false, dmg: null, dmgClass: '', face: u.side === 0 ? 1 : -1, energy: 0, cost, lastAct: 0, cy: 0 };
   }
   list.value = res().units.map(u => u.uid);
 }
+/** @param {UnitSnap} u */
 const svgFor = (u) => critterSvg(critterById(u.id), 40, { frame: false, walk: true });   // patas animadas (SVG)
+/** @param {{ col: number }} u */
 const leftOf = (u) => (u.col / COLS * 100) + '%';
+/** @param {{ row: number }} u */
 const topOf = (u) => (u.row / ROWS * 100) + '%';
 
 // Tamaño POR RAREZA, SOLO en el campo: critterSvg auto-encaja todo al mismo tamaño,
@@ -44,19 +56,25 @@ const topOf = (u) => (u.row / ROWS * 100) + '%';
 // poco la celda; interpolación GEOMÉTRICA (cada tier ×1.147) para que el medio quede
 // proporcional. No toca las cartas/colección (eso usa critterSvg tal cual).
 const R_SCALE_MIN = 0.6, R_SCALE_MAX = 1.8;
+/** @param {number} ri */
 const rarityScale = (ri) => {
   const i = Math.max(0, Math.min(8, ri | 0));
   return +(R_SCALE_MIN * Math.pow(R_SCALE_MAX / R_SCALE_MIN, i / 8)).toFixed(3);
 };
+/** @param {UnitSnap} u */
 const scaleOf = (u) => rarityScale(critterById(u.id).rarityIndex);
 // Los más raros (más grandes) van por DELANTE para que su desborde tape, no quede tapado.
+/** @param {UnitSnap} u */
 const zOf = (u) => 1 + Math.max(0, Math.min(8, critterById(u.id).rarityIndex | 0));
 
 // Estela de golpe: línea atacante→objetivo en cada ataque básico.
-const trails = ref([]);
+const trails = ref(/** @type {{ k: number, x1: number, y1: number, x2: number, y2: number, crit: boolean | undefined }[]} */ ([]));
 let trailN = 0;
+/** @param {{ col: number }} u */
 const cxU = (u) => ((u.col + 0.5) / COLS * 100);
+/** @param {{ row: number }} u */
 const cyU = (u) => ((u.row + 0.5) / ROWS * 100);
+/** @param {LiveUnit} by @param {LiveUnit} tgt @param {boolean | undefined} crit */
 function addTrail (by, tgt, crit) {
   const k = ++trailN;
   trails.value.push({ k, x1: cxU(by), y1: cyU(by), x2: cxU(tgt), y2: cyU(tgt), crit });
@@ -64,9 +82,15 @@ function addTrail (by, tgt, crit) {
 }
 
 // Toasts de EVENTOS ESPECIALES sobre cada unidad (suben y dejan ver el siguiente).
-const floaters = ref([]);
+const floaters = ref(/** @type {{ k: number, uid: string, text: string, cls: string, off: number }[]} */ ([]));
 let floatN = 0;
+/** @param {string} uid */
 const floatersFor = (uid) => floaters.value.filter(f => f.uid === uid);
+/**
+ * @param {string | null | undefined} uid
+ * @param {string} text
+ * @param {string} cls
+ */
 function addFloater (uid, text, cls) {
   if (!uid || !U[uid]) return;
   const off = Math.min(3, floaters.value.filter(f => f.uid === uid).length);
@@ -74,16 +98,20 @@ function addFloater (uid, text, cls) {
   floaters.value.push({ k, uid, text, cls, off });
   setTimeout(() => { if (alive) floaters.value = floaters.value.filter(f => f.k !== k); }, 1000);
 }
+/** @param {LiveUnit | null | undefined} u @param {number} amt */
 const gainEnergy = (u, amt) => { if (u) u.energy = Math.max(0, Math.min(u.cost, u.energy + amt)); };
+/** @param {LiveUnit} u @param {number | undefined} val @param {string} cls */
 function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { if (alive) u.flash = false; }, 220); }
 
+/** @param {LogEntry} ev @param {boolean} [silent] */
 function applyEv (ev, silent) {
   const u = ev.target && U[ev.target], by = ev.by && U[ev.by], actor = ev.actor && U[ev.actor];
   if (actor && ev.cyc != null) actor.lastAct = ev.cyc;   // al actuar, su barra de ciclo se reinicia
   if (ev.t === 'move') {
     if (by) {
-      if (ev.c !== by.col) by.face = ev.c > by.col ? 1 : -1;
-      by.row = ev.r; by.col = ev.c;
+      if (ev.c !== by.col) by.face = Number(ev.c) > by.col ? 1 : -1;
+      // Un `move` siempre lleva la casilla nueva (`r`, `c`).
+      by.row = /** @type {number} */ (ev.r); by.col = /** @type {number} */ (ev.c);
       if (ev.kb) { if (!silent) addFloater(ev.by, '↩', 'fl-kb'); }
       else if (ev.by === ev.actor) gainEnergy(by, 6);
     }
@@ -95,7 +123,7 @@ function applyEv (ev, silent) {
     if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) { addFloater(ev.target, '+' + (ev.heal || 0), 'fl-heal'); if (ev.t === 'heal') sfx.heal(); } }
   } else if (ev.t === 'active') {
     if (actor) actor.energy = 0;   // gastó la barra de energía
-    if (!silent) { sfx.active(); addFloater(ev.by || ev.actor, loc(ACTIVES[ev.ability] || {}) || '✦', 'fl-active'); }
+    if (!silent) { sfx.active(); addFloater(ev.by || ev.actor, loc(ev.ability ? ACTIVES[ev.ability] : null) || '✦', 'fl-active'); }
   } else if (ev.t === 'buff') {
     if (!silent && Array.isArray(ev.targets)) for (const tid of ev.targets) addFloater(tid, '+' + (ev.stat || 'BUFF'), 'fl-buff');
   } else if (ev.t === 'stun') {
@@ -106,13 +134,14 @@ function applyEv (ev, silent) {
 }
 function updateCharge () { for (const uid of list.value) { const u = U[uid]; if (u && !u.dead) u.cy = Math.min(1, (clock - u.lastAct) * (u.spd || 1) / CH); } }
 
+/** @param {number} ts */
 function frame (ts) {
   if (!alive) return;
   if (!lastTs) lastTs = ts;
   const dt = Math.min(120, ts - lastTs); lastTs = ts;
   clock += (dt / CYCLE_MS) * speed.value * PLAYBACK;
   const log = res().log;
-  while (idx < log.length && (log[idx].cyc == null ? 0 : log[idx].cyc) <= clock) applyEv(log[idx++]);
+  while (idx < log.length && (log[idx].cyc ?? 0) <= clock) applyEv(log[idx++]);
   updateCharge();
   if (idx >= log.length) { endBattle(); return; }
   rafId = requestAnimationFrame(frame);
@@ -145,13 +174,17 @@ function next () { if (props.payload.nextNode) emit('next', props.payload.nextNo
 // y vida restante, más el daño total recibido por el equipo. Se computa del log.
 const summary = computed(() => {
   if (!finished.value) return null;
-  const dealt = {}, taken = {};
+  /** @type {Record<string, number>} */
+  const dealt = {};
+  /** @type {Record<string, number>} */
+  const taken = {};
   for (const e of res().log) {
     if (e.t === 'attack' || e.t === 'thorns') {
       if (e.by) dealt[e.by] = (dealt[e.by] || 0) + (e.dmg || 0);
       if (e.target) taken[e.target] = (taken[e.target] || 0) + (e.dmg || 0);
     }
   }
+  /** @type {FightResult['xp']} */
   const xp = props.payload.xp || {};
   const mine = res().units.filter(u => u.side === 0).map(u => ({
     name: u.name, hp: Math.max(0, U[u.uid] ? U[u.uid].hp : 0), maxHp: u.maxHp,

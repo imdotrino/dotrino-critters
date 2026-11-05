@@ -13,6 +13,13 @@ export const BAL = {
 };
 
 // Daño = ATK con mitigación por DEF (rendimientos decrecientes) × tipo × crítico.
+/**
+ * @param {number} atk
+ * @param {number} def
+ * @param {number} typeMult
+ * @param {boolean} crit
+ * @returns {number}
+ */
 export function basicDamage (atk, def, typeMult, crit) {
   const mitig = def / (def + 90);
   const d = atk * (1 - mitig) * typeMult * (crit ? BAL.critMult : 1);

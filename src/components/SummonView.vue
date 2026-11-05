@@ -6,10 +6,10 @@ import { summon as sfxSummon } from '../sfx.js';
 import { t } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
-const last = ref(null);
+const last = ref(/** @type {import('../types.js').Instance | null} */ (null));
 const err = ref('');
 const cost = computed(() => summonCost());
-function doSummon () { const r = summon(); if (r.error === 'coins') { err.value = t('sinMonedas'); return; } err.value = ''; last.value = r.instance; sfxSummon(); }
+function doSummon () { const r = summon(); if (r.error === 'coins') { err.value = t('sinMonedas'); return; } err.value = ''; last.value = r.instance || null; sfxSummon(); }
 </script>
 
 <template>

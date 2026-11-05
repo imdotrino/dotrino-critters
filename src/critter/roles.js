@@ -2,6 +2,7 @@
 // habilidades. 'distancia' es a distancia (ignora el bloqueo posicional).
 export const ROLES = ['tanque', 'peleador', 'dps', 'distancia', 'soporte', 'control'];
 
+/** @type {Record<string, { es: string, en: string }>} */
 export const ROLE_INFO = {
   tanque:    { es: 'Tanque',     en: 'Tank' },
   peleador:  { es: 'Peleador',   en: 'Bruiser' },
@@ -12,6 +13,7 @@ export const ROLE_INFO = {
 };
 
 // Pesos de reparto del presupuesto entre HP/ATK/DEF/SPD (suman ~1).
+/** @type {Record<string, import('../types.js').Stats>} */
 export const ROLE_WEIGHTS = {
   tanque:    { HP: 0.38, ATK: 0.24, DEF: 0.22, SPD: 0.16 },
   peleador:  { HP: 0.30, ATK: 0.34, DEF: 0.16, SPD: 0.20 },

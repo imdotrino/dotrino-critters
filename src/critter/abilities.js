@@ -6,6 +6,7 @@
 // type: 'damage' | 'heal' | 'buff' | 'stun'
 // scope (damage): 'single' (1 objetivo) | 'all' | 'backmost'
 // scope (heal): 'lowestAlly' | 'self' ; (buff): 'self' | 'allies'
+/** @type {Record<string, import('../types.js').ActiveAbility>} */
 export const ACTIVES = {
   tajo:       { type: 'damage', mult: 1.9, scope: 'single', cost: 100, es: 'Tajo brutal', en: 'Brutal Slash', d: { es: 'Golpe fuerte a un objetivo.', en: 'Heavy hit to one target.' } },
   meteoro:    { type: 'damage', mult: 0.85, scope: 'all', cost: 100, es: 'Lluvia', en: 'Barrage', d: { es: 'Daña a todos los enemigos.', en: 'Hits all enemies.' } },
@@ -18,6 +19,7 @@ export const ACTIVES = {
 
 // ---- Pasivas ----
 // statMult: multiplica un stat base al inicio. behavioral: lifesteal/thorns/enrage/regen.
+/** @type {Record<string, import('../types.js').Passive>} */
 export const PASSIVES = {
   coraza:  { stat: 'DEF', statMult: 1.18, es: 'Coraza', en: 'Carapace', d: { es: '+18% DEF.', en: '+18% DEF.' } },
   agil:    { stat: 'SPD', statMult: 1.18, es: 'Ágil', en: 'Swift', d: { es: '+18% VEL.', en: '+18% SPD.' } },
@@ -29,6 +31,7 @@ export const PASSIVES = {
 };
 
 // Pools por rol (de qué elige el forge). Fallback al pool general si faltara.
+/** @type {Record<string, string[]>} */
 export const ROLE_ACTIVE_POOL = {
   tanque:    ['muro', 'aturdir'],
   peleador:  ['tajo', 'frenesi'],
@@ -37,6 +40,7 @@ export const ROLE_ACTIVE_POOL = {
   soporte:   ['sanar', 'muro'],
   control:   ['aturdir', 'meteoro'],
 };
+/** @type {Record<string, string[]>} */
 export const ROLE_PASSIVE_POOL = {
   tanque:    ['coraza', 'espinas', 'robusto'],
   peleador:  ['furia', 'vampiro', 'robusto'],

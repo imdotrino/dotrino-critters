@@ -2,10 +2,12 @@
 // sigue jugándose offline (los referidos simplemente no se reportan). Patrón del messenger.
 import { Identity } from '@dotrino/identity';
 
+/** @type {Promise<Identity | null> | null} */
 let _idPromise = null;
 
+/** @returns {Promise<Identity | null>} */
 export function getIdentity () {
-  const testVault = globalThis.__TEST_VAULT_PROMISE__;   // hook SOLO para E2E
+  const testVault = /** @type {{ __TEST_VAULT_PROMISE__?: Promise<Identity | null> }} */ (globalThis).__TEST_VAULT_PROMISE__;   // hook SOLO para E2E
   if (testVault) { _idPromise = testVault; return _idPromise; }
   if (!_idPromise) {
     _idPromise = Identity.connect()

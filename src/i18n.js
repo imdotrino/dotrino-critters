@@ -8,6 +8,7 @@ import { reactive } from 'vue';
 const LANG_KEY = 'dotrino.lang';
 const LANG_KEY_OLD = 'critters_lang';
 
+/** @returns {'es' | 'en'} */
 function readLang () {
   let s = null;
   try { s = localStorage.getItem(LANG_KEY); } catch {}
@@ -24,8 +25,10 @@ function readLang () {
 
 export const i18n = reactive({ lang: readLang() });
 
+/** @param {string} l */
 export function setLang (l) { if (l !== 'es' && l !== 'en') return; i18n.lang = l; try { localStorage.setItem(LANG_KEY, l); } catch {} document.documentElement.lang = l; }
 
+/** @type {Record<'es' | 'en', Record<string, string>>} */
 const STR = {
   es: {
     storeProblem: 'No se pudo abrir tu almacén: esta partida no se guardará.',
@@ -45,7 +48,7 @@ const STR = {
     flanquea: 'Flanquea', frontal: 'Frontal', resumen: 'Resumen', dRecibido: 'Daño recibido total',
     lblVida: 'Vida', lblDanio: 'Daño', lblRecib: 'Recibido',
     puntos: 'Puntos', resetear: 'Resetear', lblLibres: 'libres',
-    repetir: 'Repetir', siguiente: 'Siguiente', verBatalla: 'Ver batalla', verCampo: 'Ver campo', resumen: 'Resumen', pelearDeNuevo: 'Pelear de nuevo', aturdido: 'Aturdido',
+    repetir: 'Repetir', siguiente: 'Siguiente', verBatalla: 'Ver batalla', verCampo: 'Ver campo', pelearDeNuevo: 'Pelear de nuevo', aturdido: 'Aturdido',
     statHP: 'VIDA', statATK: 'ATQ', statDEF: 'DEF', statSPD: 'VEL',
     pasiva: 'Pasiva', activa: 'Activa', tipo: 'Tipo', rol: 'Rol', rareza: 'Rareza',
     colVacia: 'Aún no tienes criaturas. Invoca una o gana niveles para capturarlas.',
@@ -64,7 +67,7 @@ const STR = {
     bossOculto: 'Equipo oculto hasta derrotar al jefe.',
     estrellas: 'Estrellas', star1: 'Victoria', star2: 'Rápido', star3: 'Sin bajas', star2obj: '≤ {n} ciclos',
     gateFaltan: 'Faltan {n}★ para entrar a este terreno', nuevoRecord: '¡récord!',
-    tabStats: 'Stats', tabElemento: 'Elemento', tabHabilidades: 'Habilidades', tabCombate: 'Combate', ultimoEnf: 'Último enfrentamiento', rol: 'Rol', porRol: 'por rol', apodo: 'Apodo (la raza queda entre paréntesis)', apodoPh: 'Apodo',
+    tabStats: 'Stats', tabElemento: 'Elemento', tabHabilidades: 'Habilidades', tabCombate: 'Combate', ultimoEnf: 'Último enfrentamiento', porRol: 'por rol', apodo: 'Apodo (la raza queda entre paréntesis)', apodoPh: 'Apodo',
     composicion: 'Composición de ingredientes', ingredientes: 'ingredientes', distintos: 'distintos',
     alMapa: 'Al mapa', alineacion: 'Alineación', nueva: 'Nueva', tuAlineacion: 'Tu alineación',
     banquillo: 'Banquillo', banquilloVacio: 'Todos los Critters están en alguna alineación.', usar: 'Usar', enUso: 'En uso',
@@ -95,7 +98,7 @@ const STR = {
     flanquea: 'Flanker', frontal: 'Frontline', resumen: 'Summary', dRecibido: 'Total damage taken',
     lblVida: 'HP', lblDanio: 'Dmg', lblRecib: 'Taken',
     puntos: 'Points', resetear: 'Reset', lblLibres: 'free',
-    repetir: 'Replay', siguiente: 'Next', verBatalla: 'Watch battle', verCampo: 'View field', resumen: 'Summary', pelearDeNuevo: 'Fight again', aturdido: 'Stunned',
+    repetir: 'Replay', siguiente: 'Next', verBatalla: 'Watch battle', verCampo: 'View field', pelearDeNuevo: 'Fight again', aturdido: 'Stunned',
     statHP: 'HP', statATK: 'ATK', statDEF: 'DEF', statSPD: 'SPD',
     pasiva: 'Passive', activa: 'Active', tipo: 'Type', rol: 'Role', rareza: 'Rarity',
     colVacia: 'No critters yet. Summon one or win levels to capture them.',
@@ -114,7 +117,7 @@ const STR = {
     bossOculto: 'Team hidden until you beat the boss.',
     estrellas: 'Stars', star1: 'Win', star2: 'Fast', star3: 'No losses', star2obj: '≤ {n} cycles',
     gateFaltan: 'Need {n}★ to enter this terrain', nuevoRecord: 'record!',
-    tabStats: 'Stats', tabElemento: 'Element', tabHabilidades: 'Abilities', tabCombate: 'Combat', ultimoEnf: 'Last battle', rol: 'Role', porRol: 'per role', apodo: 'Nickname (race stays in parentheses)', apodoPh: 'Nickname',
+    tabStats: 'Stats', tabElemento: 'Element', tabHabilidades: 'Abilities', tabCombate: 'Combat', ultimoEnf: 'Last battle', porRol: 'per role', apodo: 'Nickname (race stays in parentheses)', apodoPh: 'Nickname',
     composicion: 'Ingredient composition', ingredientes: 'ingredients', distintos: 'distinct',
     alMapa: 'To map', alineacion: 'Lineup', nueva: 'New', tuAlineacion: 'Your lineup',
     banquillo: 'Bench', banquilloVacio: 'All critters are in a lineup.', usar: 'Use', enUso: 'In use',
@@ -129,6 +132,11 @@ const STR = {
   },
 };
 
+/** @param {string} k @returns {string} */
 export function t (k) { return (STR[i18n.lang] || STR.es)[k] ?? STR.es[k] ?? k; }
 /** Texto localizado de un objeto {es,en}. */
+/**
+ * @param {Partial<Record<'es' | 'en', string>> | null | undefined} obj
+ * @returns {string}
+ */
 export function loc (obj) { if (!obj) return ''; return obj[i18n.lang] || obj.es || obj.en || ''; }

@@ -13,11 +13,21 @@ import { RANGED_ROLES } from '../critter/roles.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { BAL, basicDamage } from './balance.js';
 import { normalizeRol, normalizeTargets } from './policies.js';
+/** @import { TeamMember, Unit, UnitSnap, LogEntry, BattleResult, ActiveAbility, StatKey } from '../types.js' */
+/** @import { Rng } from '../lib/rng.js' */
+/** @typedef {Record<string, string>} Occupancy  'fila,columna' → uid de quien está */
+/** @typedef {'atacante' | 'defensa' | 'soporte'} ActiveRole */
 
 export const COLS = 8, ROWS = 5;
 const ROW_OFFSET = (ROWS - 3) >> 1;   // centra la formación 3×3 verticalmente (filas 1-3 en 5)
 const AOE = new Set(['all', 'self', 'allies', 'backmost']);   // activas que no requieren rango
 
+/**
+ * @param {TeamMember[]} team
+ * @param {0 | 1} side
+ * @param {string | null} terrain
+ * @returns {Unit[]}
+ */
 function buildUnits (team, side, terrain) {
   return team.map((m, i) => {
     const critter = makeCritter(m.id);
@@ -46,7 +56,13 @@ function buildUnits (team, side, terrain) {
   });
 }
 
+/** @param {{ row: number, col: number }} a @param {{ row: number, col: number }} b */
 const cheb = (a, b) => Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col));
+/**
+ * @param {Unit} u
+ * @param {'ATK' | 'DEF' | 'SPD'} stat
+ * @returns {number}
+ */
 function eff (u, stat) {
   let v = u[stat];
   for (const x of u.buffs) if (x.stat === stat) v *= x.mult;
@@ -54,9 +70,18 @@ function eff (u, stat) {
   if (u.terrainFav && (stat === 'ATK' || stat === 'DEF')) v *= BAL.terrainMult;   // ventaja de terreno
   return v;
 }
+/** @param {Unit} u @param {LogEntry[]} log */
 function faint (u, log) { if (u.alive) { u.alive = false; u.hp = 0; log.push({ t: 'faint', target: u.uid }); } }
+/** @param {Unit} u */
 function gainHit (u) { u.energy = Math.min(ACTIVES[u.active].cost, u.energy + BAL.energyPerHit); }
 
+/**
+ * @param {Unit | null} att
+ * @param {Unit} tgt
+ * @param {number} amount
+ * @param {LogEntry[]} log
+ * @param {Partial<LogEntry>} [extra]
+ */
 function dealDamage (att, tgt, amount, log, extra) {
   amount = Math.max(1, Math.round(amount));
   tgt.hp -= amount; gainHit(tgt);
@@ -71,6 +96,14 @@ function dealDamage (att, tgt, amount, log, extra) {
   if (tgt.hp <= 0) faint(tgt, log);
 }
 
+/**
+ * @param {Unit} u
+ * @param {Unit} target
+ * @param {Rng} rng
+ * @param {LogEntry[]} log
+ * @param {number} [mult]
+ * @param {string} [ability]
+ */
 function attackTarget (u, target, rng, log, mult, ability) {
   const crit = rng() < BAL.critChance;
   const tm = typeMultiplier(u.element, target.element);
@@ -81,6 +114,12 @@ function attackTarget (u, target, rng, log, mult, ability) {
 // Casilla de empuje hacia la retaguardia (columna alejándose del atacante = vector
 // positivo). Prueba recto y luego diagonales (misma columna trasera, fila ±1). null si
 // no hay ninguna (borde o todas ocupadas).
+/**
+ * @param {Unit} target
+ * @param {Unit} attacker
+ * @param {Occupancy} occ
+ * @returns {{ row: number, col: number } | null}
+ */
 function knockbackCell (target, attacker, occ) {
   const dir = Math.sign(target.col - attacker.col) || (attacker.side === 0 ? 1 : -1);
   const nc = target.col + dir;
@@ -94,6 +133,13 @@ function knockbackCell (target, attacker, occ) {
 }
 // Ataque básico: el 2º (o más) golpe SEGUIDO al mismo objetivo lo EMPUJA hacia atrás
 // (recto o diagonal). Si NO hay casilla para empujar → el golpe hace DOBLE daño.
+/**
+ * @param {Unit} u
+ * @param {Unit} target
+ * @param {Occupancy} occ
+ * @param {Rng} rng
+ * @param {LogEntry[]} log
+ */
 function basicAttack (u, target, occ, rng, log) {
   const repeat = u.lastTarget === target.uid;
   const cell = repeat ? knockbackCell(target, u, occ) : null;
@@ -108,19 +154,36 @@ function basicAttack (u, target, occ, rng, log) {
 
 // Candidatos para un criterio: los filtros por rol/tipo pueden quedar VACÍOS (→ se
 // cae al siguiente criterio de la prioridad); los selectores operan sobre todos.
+/**
+ * @param {string | undefined} crit
+ * @param {Unit[]} enemies
+ */
 function candidatesFor (crit, enemies) {
   const alive = enemies.filter(e => e.alive);
   if (crit === 'soporte') return alive.filter(e => e.role === 'soporte');
   if (crit === 'rango') return alive.filter(e => e.range > 1);
   return alive;   // debil / fuerte / cercano
 }
+/**
+ * @param {string | undefined} crit
+ * @param {Unit} u
+ * @param {Unit} e
+ */
 function critScore (crit, u, e) {   // menor = mejor; desempate determinista por uid (arriba)
   if (crit === 'debil') return e.hp * 1000 + cheb(u, e);
   if (crit === 'fuerte') return -(e.maxHp + e.ATK * 5) * 1000 + cheb(u, e);
   return cheb(u, e) * 1000 + e.hp;   // soporte / rango / cercano: el más cercano (luego el más débil)
 }
+/**
+ * @param {Unit} u
+ * @param {Unit[]} enemies
+ * @param {string | undefined} crit
+ * @returns {Unit | null}
+ */
 function pickBy (u, enemies, crit) {
-  let b = null, bs = Infinity;
+  /** @type {Unit | null} */
+  let b = null;
+  let bs = Infinity;
   for (const e of candidatesFor(crit, enemies)) {
     const s = critScore(crit, u, e);
     if (s < bs || (s === bs && (b == null || e.uid < b.uid))) { bs = s; b = e; }
@@ -129,21 +192,43 @@ function pickBy (u, enemies, crit) {
 }
 // Objetivo según la PRIORIDAD ordenada: el primer criterio con candidato válido gana.
 // Fallback final: el más cercano (siempre hay si quedan enemigos vivos).
+/**
+ * @param {Unit} u
+ * @param {Unit[]} enemies
+ * @returns {Unit | null}
+ */
 function chooseTarget (u, enemies) {
   const list = Array.isArray(u.target) ? u.target : [u.target];
   for (const crit of list) { const t = pickBy(u, enemies, crit); if (t) return t; }
   return pickBy(u, enemies, 'cercano');
 }
-function farthest (u, enemies) { let b = null; for (const e of enemies) if (e.alive && (!b || cheb(u, e) > cheb(u, b))) b = e; return b; }
+/**
+ * @param {Unit} u
+ * @param {Unit[]} enemies
+ * @returns {Unit | null}
+ */
+function farthest (u, enemies) {
+  /** @type {Unit | null} */
+  let b = null;
+  for (const e of enemies) if (e.alive && (!b || cheb(u, e) > cheb(u, b))) b = e;
+  return b;
+}
 // El SOPORTE elige a quién AYUDAR según su prioridad sobre ALIADOS (no enemigos):
 // herido (menor %vida) · vida (menos vida) · frente (más adelantado) · mismo.
+/**
+ * @param {Unit} u
+ * @param {Unit[]} allies
+ * @returns {Unit | null}
+ */
 function chooseAlly (u, allies) {
   const list = (u.targets && u.targets.soporte) || ['herido'];
   const alive = allies.filter(a => a.alive);
   if (!alive.length) return null;
   for (const crit of list) {
     if (crit === 'mismo') { if (u.alive) return u; continue; }
-    let b = null, bs = Infinity;
+    /** @type {Unit | null} */
+    let b = null;
+    let bs = Infinity;
     for (const a of alive) {
       const s = crit === 'vida' ? a.hp : crit === 'frente' ? (u.side === 0 ? -a.col : a.col) : (a.hp / a.maxHp);
       if (b == null || s < bs || (s === bs && a.uid < b.uid)) { bs = s; b = a; }
@@ -160,9 +245,18 @@ function chooseAlly (u, allies) {
 //    rodean). Esto evita que todas vayan a la misma casilla y se encolen.
 //  - frontal: solo celdas del lado que mira a su bando (no rodea) → forma una línea
 //    de frente; si el frente está lleno, espera detrás de sus aliadas.
+/**
+ * @param {Unit} u
+ * @param {Unit} target
+ * @param {number} range
+ * @param {Occupancy} occ
+ * @returns {{ row: number, col: number }}
+ */
 function approachCell (u, target, range, occ) {
   const frontC = u.side === 0 ? -1 : 1;   // hacia dónde está el frente del enemigo respecto a u
-  let best = null, bd = Infinity;
+  /** @type {{ row: number, col: number } | null} */
+  let best = null;
+  let bd = Infinity;
   for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
     if (Math.max(Math.abs(dr), Math.abs(dc)) > range || (!dr && !dc)) continue;
     const r = target.row + dr, c = target.col + dc;
@@ -178,8 +272,17 @@ function approachCell (u, target, range, occ) {
 }
 // Da UN paso (8 direcciones, diagonal incluida) hacia `goal`, eligiendo la celda
 // libre que más acerca. Determinista.
+/**
+ * @param {Unit} u
+ * @param {{ row: number, col: number }} goal
+ * @param {Occupancy} occ
+ * @param {LogEntry[]} log
+ * @returns {boolean}
+ */
 function stepToward (u, goal, occ, log) {
-  let best = null, bk = Infinity;
+  /** @type {{ nr: number, nc: number } | null} */
+  let best = null;
+  let bk = Infinity;
   for (let mr = -1; mr <= 1; mr++) for (let mc = -1; mc <= 1; mc++) {
     if (!mr && !mc) continue;
     const nr = u.row + mr, nc = u.col + mc;
@@ -193,9 +296,18 @@ function stepToward (u, goal, occ, log) {
   return false;
 }
 
+/**
+ * @param {Unit} u
+ * @param {ActiveAbility} ab
+ * @param {Unit[]} enemies
+ * @param {Unit[]} allies
+ * @param {Rng} rng
+ * @param {LogEntry[]} log
+ */
 function castActive (u, ab, enemies, allies, rng, log) {
   log.push({ t: 'active', by: u.uid, ability: u.active });
   if (ab.type === 'damage') {
+    /** @type {Unit[]} */
     let targets = [];
     if (ab.scope === 'all') targets = enemies.filter(e => e.alive);
     else if (ab.scope === 'backmost') { const b = farthest(u, enemies); if (b) targets = [b]; }
@@ -218,6 +330,12 @@ function castActive (u, ab, enemies, allies, rng, log) {
 //  - soporte: tiene cura, hay aliado herido y NO lo están atacando (adyacente).
 //  - defensa: lo atacan (enemigo adyacente) o está herido (<40% vida).
 //  - atacante: siempre (fallback).
+/**
+ * @param {Unit} u
+ * @param {Unit[]} enemies
+ * @param {Unit[]} allies
+ * @returns {ActiveRole}
+ */
 function activeRole (u, enemies, allies) {
   const rol = (u.rol && u.rol.length) ? u.rol : ['atacante'];
   const ab = ACTIVES[u.active];
@@ -233,6 +351,15 @@ function activeRole (u, enemies, allies) {
   return 'atacante';
 }
 
+/**
+ * @param {Unit} u
+ * @param {Unit[]} enemies
+ * @param {Unit[]} allies
+ * @param {Occupancy} occ
+ * @param {Rng} rng
+ * @param {LogEntry[]} log
+ * @param {boolean} force
+ */
 function takeTurn (u, enemies, allies, occ, rng, log, force) {
   u.buffs = u.buffs.filter(b => (--b.turns) > 0);
   const p = PASSIVES[u.passive];
@@ -262,18 +389,33 @@ function takeTurn (u, enemies, allies, occ, rng, log, force) {
   if (stepToward(u, goal, occ, log)) u.energy = Math.min(ab.cost, u.energy + 6);
 }
 
+/** @param {Unit[]} t */
 const aliveN = (t) => t.reduce((n, u) => n + (u.alive ? 1 : 0), 0);
+/** @param {Unit[]} t */
 const totHp = (t) => t.reduce((n, u) => n + Math.max(0, u.hp), 0);
+/** @param {Unit} u @returns {UnitSnap} */
 const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, spd: Math.round(eff(u, 'SPD')), terrainFav: u.terrainFav });
 
+/**
+ * @param {TeamMember[]} teamA
+ * @param {TeamMember[]} teamB
+ * @param {unknown} seed
+ * @param {{ terrain?: string | null }} [opts]
+ * @returns {BattleResult}
+ */
 export function simulate (teamA, teamB, seed, opts) {
   const terrain = (opts && opts.terrain) || null;
   const A = buildUnits(teamA, 0, terrain), B = buildUnits(teamB, 1, terrain), all = [...A, ...B];
-  const occ = {}; const byUid = {}; for (const u of all) { occ[u.row + ',' + u.col] = u.uid; byUid[u.uid] = u; }
+  /** @type {Occupancy} */
+  const occ = {};
+  /** @type {Record<string, Unit>} */
+  const byUid = {};
+  for (const u of all) { occ[u.row + ',' + u.col] = u.uid; byUid[u.uid] = u; }
   // Los cadáveres se ven (snapshot conserva su posición) pero NO ocupan casilla: se libera
   // del mapa de ocupación al morir, así los vivos pueden moverse/empujar sobre ellos.
   const freeDead = () => { for (const k in occ) { const un = byUid[occ[k]]; if (un && !un.alive) delete occ[k]; } };
   const rng = mulberry32(hash32(String(seed == null ? 'seed' : seed)));
+  /** @type {LogEntry[]} */
   const log = [];
   const units = all.map(snap);
 
@@ -300,6 +442,7 @@ export function simulate (teamA, teamB, seed, opts) {
       if (aliveN(A) === 0 || aliveN(B) === 0) break;
     }
   }
+  /** @type {BattleResult['winner']} */
   let winner;
   if (aliveN(A) > 0 && aliveN(B) === 0) winner = 'A';
   else if (aliveN(B) > 0 && aliveN(A) === 0) winner = 'B';
@@ -307,7 +450,13 @@ export function simulate (teamA, teamB, seed, opts) {
   return { winner, cycles: ticks, log, units };
 }
 
+/**
+ * @param {TeamMember[]} teamA
+ * @param {TeamMember[]} teamB
+ * @param {unknown} matchId
+ */
 export function battleSeed (teamA, teamB, matchId) {
+  /** @param {TeamMember[]} t */
   const key = (t) => t.map(m => `${m.id}@${m.level ?? 1}#${m.slot}`).join(',');
   return `${key(teamA)}|${key(teamB)}|${matchId == null ? '' : matchId}`;
 }

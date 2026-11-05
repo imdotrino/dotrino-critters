@@ -7,19 +7,22 @@ import { elementInfo } from '../critter/types.js';
 import { SPEEDS, speed, setSpeed } from '../speed.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
+import { campaignSeed } from '../game/state.js';
 
 // Modal previo a la batalla: muestra el enemigo, el terreno de la zona y deja elegir
 // la VELOCIDAD antes de pelear (en combate va muy rápido). En BOSSES, el equipo
 // enemigo queda OCULTO hasta que lo derrotás.
-const props = defineProps({ nodeId: String });
+const props = defineProps({ nodeId: { type: String, required: true } });
 const emit = defineEmits(['close', 'fight']);
 
-const node = computed(() => nodeById(game.seed, props.nodeId));
+const node = computed(() => nodeById(campaignSeed(), props.nodeId));
 const revealed = computed(() => { const n = node.value; return !!n && (!n.boss || game.cleared.includes(n.id)); });
-const enemies = computed(() => node.value ? enemyTeam(node.value, game.seed).map(e => ({ id: e.id, level: e.level, alloc: e.alloc })) : []);
+const enemies = computed(() => node.value ? enemyTeam(node.value, campaignSeed()).map(e => ({ id: e.id, level: e.level, alloc: e.alloc })) : []);
 const terrainEl = computed(() => node.value && node.value.terrain ? elementInfo(node.value.terrain) : null);
 const curStars = computed(() => (game.stars && game.stars[props.nodeId]) || 0);
 const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
+/** @param {Event} e */
+const onLineup = (e) => setActiveLineup(/** @type {HTMLSelectElement} */ (e.target).value);
 </script>
 
 <template>
@@ -33,7 +36,7 @@ const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
 
       <div class="enc-stars">
         <span class="es-have">{{ '★'.repeat(curStars) }}<span class="es-empty">{{ '☆'.repeat(3 - curStars) }}</span></span>
-        <div class="es-obj">1★ {{ t('star1') }} · 2★ {{ t('star2obj').replace('{n}', cycLimit) }} · 3★ {{ t('star3') }}</div>
+        <div class="es-obj">1★ {{ t('star1') }} · 2★ {{ t('star2obj').replace('{n}', String(cycLimit)) }} · 3★ {{ t('star3') }}</div>
       </div>
 
       <div class="enc-sub">{{ t('enemigos') }}</div>
@@ -47,7 +50,7 @@ const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
 
       <div class="enc-lineup" data-testid="enc-lineup">
         <span class="enc-sub2">{{ t('tuAlineacion') }}</span>
-        <select class="lu-select" :value="game.activeLineup" @change="e => setActiveLineup(e.target.value)">
+        <select class="lu-select" :value="game.activeLineup" @change="onLineup">
           <option v-for="l in game.lineups" :key="l.id" :value="l.id">{{ l.name }} ({{ l.team.filter(Boolean).length }}/{{ TEAM_MAX }})</option>
         </select>
       </div>
